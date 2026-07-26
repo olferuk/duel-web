@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Дуэль за Средиземье — прототип</title>
+<link rel="stylesheet" href="/static/style.css?v=13">
+</head>
+<body>
+
+<div class="lobby" id="lobby">
+  <div class="lobby-card">
+    <h1>⚔️ Дуэль за Средиземье</h1>
+    <p class="lobby-sub">Прототип с ботами-исследователями: от случайного до нейросетевого чемпиона</p>
+
+    <div class="lobby-section" id="lobby-main">
+      <button class="btn lobby-big" id="lobby-bot">🤖 Играть с ботом</button>
+      <button class="btn lobby-big" id="lobby-pvp">🔗 Играть с другом по ссылке</button>
+      <button class="btn lobby-big" id="lobby-hotseat">👥 Hot-seat за одним экраном</button>
+    </div>
+
+    <div class="lobby-section hidden" id="lobby-bot-opts">
+      <label>Соперник:
+        <select id="bot-diff"></select>
+      </label>
+      <div class="bot-desc" id="bot-desc"></div>
+      <label>Я играю за:
+        <select id="side-select">
+          <option value="0" selected>Братство Кольца</option>
+          <option value="1">Саурона</option>
+        </select>
+      </label>
+      <label class="chk"><input type="checkbox" id="promo"> промо-тайлы</label>
+      <div class="lobby-btns">
+        <button class="btn" id="start-bot">Начать партию</button>
+        <button class="btn ghost" data-back>← Назад</button>
+      </div>
+    </div>
+
+    <div class="lobby-section hidden" id="lobby-pvp-opts">
+      <label>Я играю за:
+        <select id="pvp-side-select">
+          <option value="0" selected>Братство Кольца</option>
+          <option value="1">Саурона</option>
+        </select>
+      </label>
+      <label class="chk"><input type="checkbox" id="pvp-promo"> промо-тайлы</label>
+      <div class="lobby-btns">
+        <button class="btn" id="start-pvp">Создать комнату</button>
+        <button class="btn ghost" data-back>← Назад</button>
+      </div>
+    </div>
+
+    <div class="lobby-section hidden" id="lobby-wait">
+      <p>Комната создана. Отправь другу ссылку:</p>
+      <div class="room-link-row">
+        <code id="room-link"></code>
+        <button class="btn small" id="copy-link">📋 Копировать</button>
+      </div>
+      <p class="waiting-pulse">⏳ Ожидание соперника…</p>
+    </div>
+
+    <div class="lobby-section hidden" id="lobby-join">
+      <p id="join-info">Подключаюсь к комнате…</p>
+    </div>
+  </div>
+</div>
+
+<div class="table">
+
+  <aside class="player-area fellowship" id="panel-0">
+    <h2>Братство Кольца</h2>
+    <div class="panel-body"></div>
+  </aside>
+
+  <main class="center">
+    <header class="topbar">
+      <div class="chapter-buttons">
+        <button class="btn" id="to-lobby">← В лобби</button>
+        <span class="room-info" id="room-info"></span>
+      </div>
+      <div class="pools">
+        <span class="pool" id="reserve">🪙 —</span>
+      </div>
+    </header>
+
+    <section class="turnbar" id="turnbar">Нажми «Новая партия»</section>
+    <section class="prompt" id="prompt" style="display:none"></section>
+
+    <section class="supply-row">
+      <div class="race-row" id="race-row"></div>
+      <div class="landmark-row" id="landmark-row"></div>
+    </section>
+
+    <section class="mid-row">
+      <div class="tableau-wrap">
+        <div class="piles" id="piles"></div>
+        <div class="tableau" id="tableau">
+          <div class="empty-hint">Партия не начата</div>
+        </div>
+      </div>
+      <section class="board">
+        <svg id="map" viewBox="0 0 100 52"></svg>
+      </section>
+    </section>
+
+    <section class="quest">
+      <div class="quest-track" id="quest-track"></div>
+    </section>
+
+    <section class="gamelog">
+      <div class="quest-log" id="game-log"></div>
+    </section>
+  </main>
+
+  <aside class="player-area sauron" id="panel-1">
+    <h2>Саурон</h2>
+    <div class="panel-body"></div>
+  </aside>
+
+</div>
+<script src="/static/app.js?v=13"></script>
+</body>
+</html>

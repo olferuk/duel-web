@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: duel-middle-earth
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/board
