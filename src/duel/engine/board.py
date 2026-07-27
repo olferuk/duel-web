@@ -4,8 +4,9 @@
 board's aspect ratio), eyeballed from the rulebook photos — used only for
 drawing the UI.
 
-Adjacency: lindon-enedwaith removed per the owner (board in hand); the rest
-still to be re-verified against the real central board.
+Adjacency verified with the owner (board in hand): lindon-enedwaith absent,
+enedwaith-rhovanion PRESENT (fixed 2026-07-28 — bots before this date trained
+on the wrong graph).
 """
 
 # Neat 3-2-2 grid (rows y=9/26/43): reads like a diagram since we don't
@@ -27,6 +28,7 @@ EDGES: list[tuple[str, str]] = [
     ("rhovanion", "rohan"),
     ("rhovanion", "mordor"),
     ("enedwaith", "rohan"),
+    ("enedwaith", "rhovanion"),  # правка владельца 2026-07-28: соединены!
     ("enedwaith", "gondor"),
     ("rohan", "gondor"),
     ("rohan", "mordor"),

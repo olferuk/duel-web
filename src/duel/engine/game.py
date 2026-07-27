@@ -413,7 +413,19 @@ class Game:
         if self.winner is not None:
             return []
         if self.pending:
-            return self._pending_moves(self.pending[0])
+            moves = self._pending_moves(self.pending[0])
+            if (
+                self.pending[0].get("combo")
+                and len(self.pending) > 1
+                and self.pending[1].get("combo")
+            ):
+                # пара эффектов одной карты: игрок выбирает порядок сам
+                second = [
+                    m for m in self._pending_moves(self.pending[1]) if m["type"] != "skip"
+                ]
+                seen = {tuple(sorted(m.items())) for m in moves}
+                moves += [m for m in second if tuple(sorted(m.items())) not in seen]
+            return moves
         moves: list[dict] = []
         p = self.current
         for sid in self.tableau.available():
@@ -517,7 +529,7 @@ class Game:
                     {
                         "type": "discard_play",
                         "index": i,
-                        "label": f"Из сброса: {card_label(c)}",
+                        "label": card_label(c),
                         "card": card_to_dict(c),
                     }
                 )
@@ -709,14 +721,20 @@ class Game:
             self._green_effects(p, card)
         elif card.type is CardType.PURPLE:
             if card.movements:
-                self.pending.append({"type": "movements", "player": p, "n": card.movements})
+                combo = bool(card.casualties)  # пара эффектов одной карты — порядок свободный
+                self.pending.append(
+                    {"type": "movements", "player": p, "n": card.movements, "combo": combo}
+                )
             if card.opp_coins_lost:
                 lost = min(card.opp_coins_lost, self.players[1 - p].coins)
                 self.players[1 - p].coins -= lost
                 self.reserve += lost
                 self.log.append(f"{SIDE_RU[1 - p]} теряет {lost}🪙")
             if card.casualties:
-                self.pending.append({"type": "casualties", "player": p, "n": card.casualties})
+                combo = bool(card.movements)
+                self.pending.append(
+                    {"type": "casualties", "player": p, "n": card.casualties, "combo": combo}
+                )
 
     def _green_effects(self, p: int, card: Card) -> None:
         player = self.players[p]
@@ -824,6 +842,12 @@ class Game:
 
     def _apply_pending(self, move: dict) -> None:
         pd = self.pending[0]
+        if pd.get("combo") and len(self.pending) > 1 and self.pending[1].get("combo"):
+            # свободный порядок пары эффектов: ход адресует нужный пендинг
+            want = {"move": "movements", "kill": "casualties"}.get(move["type"])
+            if want and pd["type"] != want and self.pending[1]["type"] == want:
+                self.pending[0], self.pending[1] = self.pending[1], self.pending[0]
+                pd = self.pending[0]
         p = pd["player"]
         t = move["type"]
         if t == "skip":

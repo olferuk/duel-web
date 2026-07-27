@@ -797,3 +797,27 @@ body.cb { --band: 0.265; }
 .rules-link .rules-ico { font-size: 30px; }
 .rules-link b { color: #d4a017; }
 .rules-link small { opacity: 0.8; }
+
+/* тултипы взятых жетонов */
+.tok-wrap { position: relative; display: inline-block; }
+.tok-wrap:hover .tok-pop { display: block; }
+.tok-pop {
+  display: none; position: absolute; bottom: 105%; left: 50%; transform: translateX(-50%);
+  z-index: 300; width: 210px; background: #241c12; border: 1px solid var(--accent);
+  border-radius: 8px; padding: 8px 10px; font-size: 14px; line-height: 1.35;
+  color: var(--parchment); box-shadow: 0 6px 16px rgba(0,0,0,0.6); text-align: center;
+}
+
+/* галерея выбора из сброса */
+.discard-pick { cursor: pointer; width: 92px; border-radius: 6px; }
+.discard-pick img { width: 100%; border-radius: 6px; display: block;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.5); transition: transform .1s; }
+.discard-pick:hover img { transform: translateY(-4px) scale(1.06);
+  box-shadow: 0 0 0 3px #7ec97e, 0 4px 10px rgba(0,0,0,0.5); }
+
+/* стопки: колоночный поток — сверху вниз, потом слева направо */
+.stacks { display: block; columns: 2 112px; column-gap: 8px; }
+.stack-col { break-inside: avoid; margin: 0 auto 8px; }
+
+/* башня: якорь = центр НИЗА (под новую разметку) */
+.map-mark.tower { transform: translate(-50%, -100%); }

@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
-<title>Разметчик арта v2.1</title>
+<title>Разметчик арта v3</title>
 <style>
   body { font-family: Georgia, serif; background:#241c12; color:#e8dcc0; margin:0;
          display:flex; height:100vh; }
@@ -39,17 +39,22 @@
 </head>
 <body>
 <div id="side">
-  <h1>🖊 Разметчик v2.1</h1>
+  <h1>🖊 Разметчик v3</h1>
   <button id="tab-map" class="on">Карта</button>
   <button id="tab-ring">Трек Кольца</button>
   <label>Масштаб: <input type="range" id="zoom" min="0.3" max="2" step="0.05" value="0.55"></label>
   <div id="status">—</div>
 
   <div id="panel-map">
-    <h2>1. Что ставим</h2>
+    <h2>1. Точки (клик = поставить)</h2>
     <div id="target-btns"></div>
-    <div class="hint">Выбери цель (подсветится зелёным), потом кликни место на карте.
-      Никаких автопереключений: одна кнопка — один клик по карте. Точки таскаются.</div>
+    <div class="hint">Башни: якорь = центр НИЗА башни.</div>
+    <h2>2. Зоны выделения регионов</h2>
+    <div id="zone-btns"></div>
+    <label>Радиус правых углов: <input type="range" id="zr" min="0" max="120" step="2" value="40">
+      <span id="zrv">40</span>px</label>
+    <div class="hint">Выбери регион-зону → кликни ЛЕВЫЙ-ВЕРХНИЙ угол, затем ПРАВЫЙ-НИЖНИЙ.
+      Левые углы прямые, правые скруглены общим радиусом.</div>
   </div>
 
   <div id="panel-ring" style="display:none">
@@ -88,10 +93,14 @@ const DEFAULTS = {
     mordor: {units:[1775,1218], towers:[1585,1182]},
   },
   ring: { frodo:{x:80,y:184,scale:1}, nazgul:{x:-2,y:76,scale:1}, bg_cells:[], strip_cells:[] },
+  zones: {},
+  zoneRadius: 40,
 };
 let S;
 try { S = JSON.parse(localStorage.getItem("marktool21")) || null; } catch(e) { S = null; }
 if (!S) S = JSON.parse(JSON.stringify(DEFAULTS));
+if (!S.zones) S.zones = {};
+if (!S.zoneRadius) S.zoneRadius = 40;
 let mode = "map";
 let target = null;      // {region, kind} в режиме карты
 let layer = null;       // "frodo" | "nazgul"
@@ -105,7 +114,8 @@ let zoom = parseFloat(zoomEl.value);
 zoomEl.oninput = () => { zoom = parseFloat(zoomEl.value); stage.style.transform = `scale(${zoom})`; };
 
 function save() {
-  document.getElementById("json").value = JSON.stringify({map:S.map, ring:S.ring}, null, 1);
+  document.getElementById("json").value = JSON.stringify(
+    {map:S.map, zones:S.zones, zoneRadius:S.zoneRadius, ring:S.ring}, null, 1);
   localStorage.setItem("marktool21", JSON.stringify(S));
   document.getElementById("nbg").textContent = S.ring.bg_cells.length;
   document.getElementById("nstrip").textContent = S.ring.strip_cells.length;
@@ -167,10 +177,43 @@ for (const r of REGIONS) {
   tb.appendChild(wrap);
 }
 
+let zoneTarget = null;   // регион для зоны
+let zoneCorner = null;   // первый угол [x,y]
+const zb = document.getElementById("zone-btns");
+for (const r of REGIONS) {
+  const b = document.createElement("button");
+  b.textContent = "зона " + r; b.id = "z-" + r;
+  b.onclick = () => {
+    zoneTarget = r; zoneCorner = null; target = null;
+    tb.querySelectorAll("button").forEach(x => x.classList.remove("on"));
+    zb.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.id === b.id));
+    setStatus(`ЗОНА ${r}: кликни ЛЕВЫЙ-ВЕРХНИЙ угол`, true);
+  };
+  zb.appendChild(b);
+}
+const zr = document.getElementById("zr");
+zr.oninput = () => { S.zoneRadius = parseInt(zr.value);
+  document.getElementById("zrv").textContent = zr.value; drawZones(); save(); };
+
+function drawZones() {
+  stage.querySelectorAll(".zrect").forEach(z => z.remove());
+  for (const [r, z] of Object.entries(S.zones)) {
+    const d = document.createElement("div");
+    d.className = "zrect";
+    d.style.cssText = `position:absolute;left:${z[0]}px;top:${z[1]}px;width:${z[2]}px;height:${z[3]}px;
+      border:3px solid #7ec97e;border-radius:0 ${S.zoneRadius}px ${S.zoneRadius}px 0;
+      pointer-events:none;`;
+    d.innerHTML = `<span style="position:absolute;left:4px;top:2px;font-size:13px;color:#7ec97e;
+      background:rgba(0,0,0,.6);padding:0 5px;border-radius:4px">${r}</span>`;
+    stage.appendChild(d);
+  }
+}
+
 function renderMap() {
   stage.classList.remove("cells-mode");
   stage.innerHTML = `<img class="bg" src="/static/art/map.jpg">`;
   drawMapDots();
+  drawZones();
   setStatus("выбери цель слева", false);
 }
 function drawMapDots() {
@@ -299,6 +342,21 @@ stage.addEventListener("click", (ev) => {
   if (ev.target.closest(".dot")) return;
   const [x, y] = stageXY(ev);
   if (mode === "map") {
+    if (zoneTarget) {
+      if (!zoneCorner) {
+        zoneCorner = [Math.round(x), Math.round(y)];
+        setStatus(`ЗОНА ${zoneTarget}: теперь ПРАВЫЙ-НИЖНИЙ угол`, true);
+      } else {
+        const [x1, y1] = zoneCorner;
+        S.zones[zoneTarget] = [Math.min(x1,x), Math.min(y1,y),
+          Math.round(Math.abs(x-x1)), Math.round(Math.abs(y-y1))].map(Math.round);
+        drawZones(); save();
+        setStatus(`✓ зона ${zoneTarget} готова — выбери следующую`, false);
+        zb.querySelectorAll("button").forEach(b => b.classList.remove("on"));
+        zoneTarget = null; zoneCorner = null;
+      }
+      return;
+    }
     if (!target) { setStatus("сначала выбери цель слева!", false); return; }
     S.map[target.region] = S.map[target.region] || {};
     S.map[target.region][target.kind] = [Math.round(x), Math.round(y)];

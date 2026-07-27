@@ -584,7 +584,7 @@ function renderPanels() {
       <div class="coins">🪙 ${pl.coins}</div>
       <div class="stat">регионов: ${pl.presence} / 7 · рас: ${pl.race_victory_count} / 6</div>
       <div class="stat">юнитов в запасе: ${pl.supply}</div>
-      ${pl.tokens.length ? `<div class="tokens-art">${pl.tokens.map((t) => `<img class="tok-art ${t.kind === "instant" ? "used" : ""}" src="/static/art/tokens/${t.id}.png" title="${t.text}${t.kind === "instant" ? " (использован)" : ""}">`).join("")}</div>` : ""}
+      ${pl.tokens.length ? `<div class="tokens-art">${pl.tokens.map((t) => `<span class="tok-wrap"><img class="tok-art ${t.kind === "instant" ? "used" : ""}" src="/static/art/tokens/${t.id}.png"><span class="tok-pop">${t.text}${t.kind === "instant" ? " <i>(использован)</i>" : ""}</span></span>`).join("")}</div>` : ""}
       <div class="stacks">${cardsHtml}</div>
       ${pl.last_action ? `<div class="last-action">${pl.last_action}</div>` : ""}`);
     const panel = document.getElementById(`panel-${i}`);
@@ -653,16 +653,27 @@ function renderTurn() {
   if (G.pending && pendingMoves.length) {
     const why = G.pending.why ? ` (${G.pending.why})` : "";
     pr.style.display = "";
+    const isDiscard = G.pending.type === "play_from_discard";
     pr.innerHTML =
-      `<div class="prompt-title">${SIDE_RU[G.pending.player]} — выбор${why}:</div>` +
+      `<div class="prompt-title">${SIDE_RU[G.pending.player]} — ${isDiscard ? "сыграй бесплатно любую проданную карту" : "выбор" + why}:</div>` +
       `<div class="prompt-btns"></div>`;
     const box = pr.querySelector(".prompt-btns");
-    for (const m of pendingMoves.slice(0, 40)) {
-      const b = document.createElement("button");
-      b.className = "btn small";
-      b.innerHTML = coinify(m.label);
-      b.addEventListener("click", () => doMove(m));
-      box.appendChild(b);
+    for (const m of pendingMoves.slice(0, 60)) {
+      if (isDiscard && m.type === "discard_play") {
+        const card = G.discard_open[m.index];
+        const d = document.createElement("div");
+        d.className = "discard-pick";
+        d.innerHTML = `<img src="/static/art/cards/${card.id}.jpg">`;
+        d.title = m.label;
+        d.addEventListener("click", () => doMove(m));
+        box.appendChild(d);
+      } else {
+        const b = document.createElement("button");
+        b.className = "btn small";
+        b.innerHTML = coinify(m.label);
+        b.addEventListener("click", () => doMove(m));
+        box.appendChild(b);
+      }
     }
   } else if (G.pending && G.pending.type === "shire_play" && canAct()) {
     pr.style.display = "";
