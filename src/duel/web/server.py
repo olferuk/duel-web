@@ -118,33 +118,53 @@ def get_game() -> dict:
 BOT_MENU = [
     {
         "id": "champion",
-        "label": "👑 Чемпион — MCTS-240 + сеть w3",
-        "desc": "Сильнейший честный бот: поиск с нейросетью-чемпионом, PIMC без подглядывания",
+        "label": "👑 Гэндальф · ELO ≈1380",
+        "desc": "Чемпион: глубокий поиск (MCTS-240) + нейросеть w3. Честный, без подглядываний",
     },
     {
         "id": "strong",
-        "label": "Сильный — MCTS-120 + сеть w3",
-        "desc": "Тот же мозг, вдвое меньше раздумий — быстрее ходит",
+        "label": "Элронд · ELO ≈1230",
+        "desc": "Тот же мозг, что у Гэндальфа, но вдвое меньше раздумий (MCTS-120 + w3)",
     },
     {
         "id": "mcts",
-        "label": "Средний — MCTS-150 на эвристике",
-        "desc": "Классический поиск Монте-Карло с ручной оценкой позиции, без нейросетей",
+        "label": "Арагорн · ELO ≈1160",
+        "desc": "Опытный следопыт: классический Монте-Карло с ручной эвристикой, без нейросетей",
+    },
+    {
+        "id": "frodo",
+        "label": "Фродо · стиль: Кольцо",
+        "desc": "Верен миссии: рвётся по Пути Кольца к Роковой горе, порой в ущерб всему прочему",
+    },
+    {
+        "id": "witch_king",
+        "label": "Король-чародей · стиль: война",
+        "desc": "Агрессор: армии, крепости и захват регионов прежде всего",
+    },
+    {
+        "id": "galadriel",
+        "label": "Галадриэль · стиль: союзы",
+        "desc": "Дипломат: собирает поддержку всех шести рас Средиземья",
+    },
+    {
+        "id": "gollum",
+        "label": "Голлум · стиль: прелесть",
+        "desc": "Копит золото и ищет выгоду. Моя пре-е-елесть",
     },
     {
         "id": "2ply",
-        "label": "Крепкий новичок — минимакс на 2 хода",
-        "desc": "Смотрит на свой ход и твой ответ",
+        "label": "Боромир · ELO ≈1040",
+        "desc": "Смотрит на свой ход и твой ответ — но не дальше (минимакс на 2 хода)",
     },
     {
         "id": "greedy",
-        "label": "Лёгкий — жадная эвристика",
-        "desc": "Берёт лучшее прямо сейчас, не думая о будущем",
+        "label": "Гимли · ELO ≈870",
+        "desc": "Жадина: берёт лучшее прямо сейчас, не думая о будущем",
     },
     {
         "id": "random",
-        "label": "Случайный — для знакомства с правилами",
-        "desc": "Ходит наугад",
+        "label": "Пиппин · ELO ≈750",
+        "desc": "Дурак Тука: ходит наугад. Идеален для знакомства с правилами",
     },
 ]
 
@@ -163,7 +183,8 @@ def list_bots() -> dict:
         bots = ["mcts300-v8", "mcts120-v8", *bots]
     if "w3" in nets:
         bots = ["mcts300-w3", "mcts120-w3", *bots]  # reigning champion first
-    menu = [m for m in BOT_MENU if m["id"] not in ("champion", "strong") or "w3" in nets]
+    net_needed = {"champion", "strong", "frodo", "witch_king", "galadriel", "gollum"}
+    menu = [m for m in BOT_MENU if m["id"] not in net_needed or "w3" in nets]
     return {"bots": bots, "menu": menu}
 
 
@@ -220,6 +241,19 @@ def _make_bot(kind: str, seed: int = 7):
         return HonestMctsBot(sims=120, seed=seed, name=kind, eval_fn=_net_eval("w3"), worlds=4)
     if kind == "mcts":
         return HonestMctsBot(sims=150, seed=seed, name="mcts150-heur", leaf="heuristic", worlds=4)
+    if kind in ("frodo", "witch_king", "galadriel", "gollum"):
+        # предпочитаем персонально обученную сеть p_<kind>; до её появления —
+        # базовая w3 с наклоном оценки к стилю персонажа
+        try:
+            ev = _net_eval(f"p_{kind}")
+        except Exception:
+            from duel.ai.personality import personality_eval
+            from duel.ai.value_net import ValueNet
+
+            if "w3" not in _NETS:
+                _NETS["w3"] = ValueNet.load("w3")
+            ev = personality_eval(_NETS["w3"], kind)
+        return HonestMctsBot(sims=120, seed=seed, name=kind, eval_fn=ev, worlds=4)
     if kind == "2ply":
         from duel.ai.bots import TwoPlyBot
 
