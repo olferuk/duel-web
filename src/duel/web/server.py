@@ -301,7 +301,12 @@ class RoomToken(BaseModel):
 
 def _purge_rooms() -> None:
     now = time.time()
-    for rid in [r for r, room in ROOMS.items() if now - room["ts"] > ROOM_TTL]:
+    for rid in [
+        r
+        for r, room in ROOMS.items()
+        if now - room["ts"] > ROOM_TTL
+        or (room["game"].winner is not None and now - room["ts"] > 900)
+    ]:
         del ROOMS[rid]
 
 
@@ -345,8 +350,14 @@ def room_new(body: NewRoom, request: Request) -> dict:
     if len(ROOMS) >= MAX_ROOMS:
         raise HTTPException(503, "сервер переполнен, попробуй позже")
     ip = _client_ip(request)
-    if sum(1 for r in ROOMS.values() if r.get("ip") == ip) >= MAX_ROOMS_PER_IP:
-        raise HTTPException(429, "слишком много комнат с одного адреса")
+    if PUBLIC:  # локальной разработке кап не мешает
+        active = sum(
+            1
+            for r in ROOMS.values()
+            if r.get("ip") == ip and r["game"].winner is None
+        )
+        if active >= MAX_ROOMS_PER_IP:
+            raise HTTPException(429, "слишком много комнат с одного адреса")
     if PUBLIC and body.mode == "bot" and (body.bot or "mcts") not in {m["id"] for m in BOT_MENU}:
         raise HTTPException(400, "неизвестный бот")
     rid = secrets.token_urlsafe(4)

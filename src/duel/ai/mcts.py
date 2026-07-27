@@ -109,10 +109,8 @@ class MctsBot(Bot):
         moves = game.legal_moves()
         if len(moves) == 1:
             return moves[0]
-        if game.pending and game.pending[0]["type"] == "play_from_discard":
-            # options themselves expose hidden cards — worlds disagree on the
-            # move list; fall back to the standard (cheating) search here
-            return MctsBot.choose(self, game)
+        # (сброс теперь только из проданных карт — он публичен, миры всегда
+        # согласны, особый фолбэк для play_from_discard больше не нужен)
         totals = [0] * len(moves)
         per_world = max(1, self.sims // worlds)
         for _wi in range(worlds):

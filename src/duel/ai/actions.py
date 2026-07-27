@@ -76,8 +76,7 @@ def move_to_index(move: dict, game) -> int:
     if t == "pick_race":
         return _OFFSETS["pick_race"] + _RACE_IDX[move["race"]]
     if t == "discard_play":
-        pool = game.discard_hidden + game.discard_open
-        return _OFFSETS["discard_play"] + _CARD_IDX[pool[move["index"]].id]
+        return _OFFSETS["discard_play"] + _CARD_IDX[game.discard_open[move["index"]].id]
     if t == "strip_grey":
         card = game.players[1 - game.current].played[move["index"]]
         return _OFFSETS["strip_grey"] + _CARD_IDX[card.id]

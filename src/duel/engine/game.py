@@ -511,7 +511,8 @@ class Game:
                 if self.alliance_stacks[race]:
                     moves.append({"type": "pick_race", "race": race, "label": RACE_RU[race]})
         elif t == "play_from_discard":
-            for i, c in enumerate(self.discard_hidden + self.discard_open):
+            # сброс = ТОЛЬКО проданные карты; отложенные при сетапе — вне игры
+            for i, c in enumerate(self.discard_open):
                 moves.append(
                     {
                         "type": "discard_play",
@@ -890,11 +891,7 @@ class Game:
             )
         elif pd["type"] == "play_from_discard":
             self.pending.pop(0)
-            idx = move["index"]
-            if idx < len(self.discard_hidden):
-                card = self.discard_hidden.pop(idx)
-            else:
-                card = self.discard_open.pop(idx - len(self.discard_hidden))
+            card = self.discard_open.pop(move["index"])
             self.players[p].add_card(card)
             self.log.append(f"{SIDE_RU[p]} играет из сброса {card_label(card)} (бесплатно)")
             self._card_effects(p, card)

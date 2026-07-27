@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Разметчик арта v2.1</title>
+<style>
+  body { font-family: Georgia, serif; background:#241c12; color:#e8dcc0; margin:0;
+         display:flex; height:100vh; }
+  #side { width: 340px; padding: 14px; overflow-y:auto; background:#1a140c; flex-shrink:0; }
+  #stage-wrap { flex:1; overflow:auto; }
+  #stage { position:relative; transform-origin: 0 0; }
+  #stage img.bg { display:block; user-select:none; pointer-events:none; }
+  .overlay { position:absolute; cursor:grab; outline:2px dashed rgba(212,160,23,.8); }
+  .overlay.active { outline:3px solid #7ec97e; }
+  #stage.cells-mode .overlay { pointer-events:none; outline-style:dotted; }
+  .dot { position:absolute; width:16px; height:16px; border-radius:50%;
+         transform:translate(-50%,-50%); background:#7ec97e; border:2px solid #fff; }
+  .dot.towers { background:#7eaec9; }
+  .dot.cell { background:#d4a017; width:12px; height:12px; }
+  .dot span { position:absolute; top:-22px; left:10px; font-size:12px; color:#fff;
+              background:rgba(0,0,0,.7); padding:1px 6px; border-radius:4px; white-space:nowrap; }
+  h1 { font-size:18px; color:#d4a017; margin:0 0 10px; }
+  h2 { font-size:15px; color:#c9a84c; margin:14px 0 6px; }
+  button { font-family:inherit; font-size:14px; padding:6px 10px; margin:2px;
+           border-radius:6px; border:1px solid #b08d3f; background:#4a3820; color:#e8dcc0;
+           cursor:pointer; }
+  button.on { outline:3px solid #7ec97e; background:#2f5230; }
+  #status { font-size:16px; background:#2f5230; border-radius:8px; padding:8px 10px;
+            margin:8px 0; min-height:22px; }
+  #status.idle { background:#4a3820; }
+  #json { width:100%; height:130px; font-size:10px; background:#120d07; color:#9fc9a8;
+          border:1px solid #4a3820; }
+  .hint { font-size:12px; opacity:.75; line-height:1.4; }
+  #placed { font-size:12px; }
+  #placed div { display:flex; justify-content:space-between; padding:1px 0; }
+  #placed button { font-size:11px; padding:0 6px; margin:0; }
+  label { font-size:13px; display:block; margin:4px 0; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h1>🖊 Разметчик v2.1</h1>
+  <button id="tab-map" class="on">Карта</button>
+  <button id="tab-ring">Трек Кольца</button>
+  <label>Масштаб: <input type="range" id="zoom" min="0.3" max="2" step="0.05" value="0.55"></label>
+  <div id="status">—</div>
+
+  <div id="panel-map">
+    <h2>1. Что ставим</h2>
+    <div id="target-btns"></div>
+    <div class="hint">Выбери цель (подсветится зелёным), потом кликни место на карте.
+      Никаких автопереключений: одна кнопка — один клик по карте. Точки таскаются.</div>
+  </div>
+
+  <div id="panel-ring" style="display:none">
+    <h2>Слои (двигать/масштаб)</h2>
+    <button id="lay-frodo">полоса Фродо</button>
+    <button id="lay-nazgul">назгул</button>
+    <div class="hint">Выбери слой — таскай мышью, колесо = масштаб, стрелки = 1px (Shift=10).</div>
+    <h2>Клетки (кликами, по порядку)</h2>
+    <button id="cells-bg">клетки фона (<span id="nbg">0</span>)</button>
+    <button id="cells-strip">клетки полосы (<span id="nstrip">0</span>)</button>
+    <button id="cells-off">выйти из режима клеток</button>
+    <div class="hint">В режиме клеток слои «прозрачны» для мыши — клики всегда ставят точки.
+      «Клетки фона» — по клеткам, напечатанным на панораме. «Клетки полосы» — по клеткам
+      самой полосы (запишутся в её координатах).</div>
+  </div>
+
+  <h2>Поставлено</h2>
+  <div id="placed"></div>
+
+  <h2>Результат</h2>
+  <textarea id="json" readonly></textarea>
+  <button id="copy">📋 Скопировать JSON</button>
+</div>
+<div id="stage-wrap"><div id="stage"></div></div>
+
+<script>
+const REGIONS = ["lindon","arnor","rhovanion","enedwaith","rohan","gondor","mordor"];
+const DEFAULTS = {
+  map: {
+    lindon: {units:[322,458], towers:[136,424]},
+    arnor: {units:[869,344], towers:[685,307]},
+    enedwaith: {units:[778,871], towers:[593,825]},
+    rohan: {units:[1336,913], towers:[1147,873]},
+    gondor: {units:[1095,1267], towers:[911,1224]},
+    rhovanion: {units:[1605,473], towers:[1422,424]},
+    mordor: {units:[1775,1218], towers:[1585,1182]},
+  },
+  ring: { frodo:{x:80,y:184,scale:1}, nazgul:{x:-2,y:76,scale:1}, bg_cells:[], strip_cells:[] },
+};
+let S;
+try { S = JSON.parse(localStorage.getItem("marktool21")) || null; } catch(e) { S = null; }
+if (!S) S = JSON.parse(JSON.stringify(DEFAULTS));
+let mode = "map";
+let target = null;      // {region, kind} в режиме карты
+let layer = null;       // "frodo" | "nazgul"
+let cells = null;       // "bg_cells" | "strip_cells"
+let dragging = false;
+
+const stage = document.getElementById("stage");
+const statusEl = document.getElementById("status");
+const zoomEl = document.getElementById("zoom");
+let zoom = parseFloat(zoomEl.value);
+zoomEl.oninput = () => { zoom = parseFloat(zoomEl.value); stage.style.transform = `scale(${zoom})`; };
+
+function save() {
+  document.getElementById("json").value = JSON.stringify({map:S.map, ring:S.ring}, null, 1);
+  localStorage.setItem("marktool21", JSON.stringify(S));
+  document.getElementById("nbg").textContent = S.ring.bg_cells.length;
+  document.getElementById("nstrip").textContent = S.ring.strip_cells.length;
+  renderPlaced();
+}
+document.getElementById("copy").onclick = () =>
+  navigator.clipboard.writeText(document.getElementById("json").value);
+
+function setStatus(txt, active) {
+  statusEl.textContent = txt;
+  statusEl.className = active ? "" : "idle";
+}
+
+function stageXY(ev) {
+  const r = stage.getBoundingClientRect();
+  return [(ev.clientX - r.left) / zoom, (ev.clientY - r.top) / zoom];
+}
+
+/* ---------- список поставленного ---------- */
+function renderPlaced() {
+  const box = document.getElementById("placed");
+  const rows = [];
+  if (mode === "map") {
+    for (const r of REGIONS) for (const k of ["units","towers"]) {
+      const v = S.map[r] && S.map[r][k];
+      if (v) rows.push([`${r} · ${k === "units" ? "юниты" : "башни"} (${v[0]},${v[1]})`,
+                        () => { delete S.map[r][k]; refresh(); }]);
+    }
+  } else {
+    S.ring.bg_cells.forEach((c,i) => rows.push([`фон ${i} (${c[0]},${c[1]})`,
+      () => { S.ring.bg_cells.splice(i,1); refresh(); }]));
+    S.ring.strip_cells.forEach((c,i) => rows.push([`полоса ${i} (${c[0]},${c[1]})`,
+      () => { S.ring.strip_cells.splice(i,1); refresh(); }]));
+  }
+  box.innerHTML = "";
+  for (const [txt, del] of rows) {
+    const d = document.createElement("div");
+    d.innerHTML = `<span>${txt}</span>`;
+    const b = document.createElement("button"); b.textContent = "✕"; b.onclick = del;
+    d.appendChild(b); box.appendChild(d);
+  }
+}
+
+/* ---------- карта ---------- */
+const tb = document.getElementById("target-btns");
+for (const r of REGIONS) {
+  const wrap = document.createElement("div");
+  for (const k of ["units","towers"]) {
+    const b = document.createElement("button");
+    b.textContent = `${r} · ${k === "units" ? "юниты" : "башни"}`;
+    b.id = `t-${r}-${k}`;
+    b.onclick = () => {
+      target = {region:r, kind:k};
+      tb.querySelectorAll("button").forEach(x => x.classList.toggle("on", x.id === b.id));
+      setStatus(`СТАВИМ: ${r} · ${k === "units" ? "юниты" : "башни"} — кликни по карте`, true);
+    };
+    wrap.appendChild(b);
+  }
+  tb.appendChild(wrap);
+}
+
+function renderMap() {
+  stage.classList.remove("cells-mode");
+  stage.innerHTML = `<img class="bg" src="/static/art/map.jpg">`;
+  drawMapDots();
+  setStatus("выбери цель слева", false);
+}
+function drawMapDots() {
+  stage.querySelectorAll(".dot").forEach(d => d.remove());
+  for (const r of REGIONS) {
+    const m = S.map[r] || {};
+    for (const k of ["units","towers"]) {
+      if (!m[k]) continue;
+      const d = document.createElement("div");
+      d.className = `dot ${k}`;
+      d.style.left = m[k][0] + "px"; d.style.top = m[k][1] + "px";
+      d.innerHTML = `<span>${r} ${k === "units" ? "юн" : "баш"}</span>`;
+      d.addEventListener("pointerdown", (ev) => {
+        ev.stopPropagation(); ev.preventDefault(); dragging = true;
+        const move = (e) => { const [x,y] = stageXY(e);
+          m[k] = [Math.round(x), Math.round(y)];
+          d.style.left = x+"px"; d.style.top = y+"px"; };
+        const up = () => { dragging = false; save();
+          window.removeEventListener("pointermove", move);
+          window.removeEventListener("pointerup", up); };
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+      });
+      stage.appendChild(d);
+    }
+  }
+}
+
+/* ---------- трек ---------- */
+function renderRing() {
+  stage.innerHTML = `<img class="bg" src="/static/art/ring/track-bg.jpg">`;
+  stage.classList.toggle("cells-mode", !!cells);
+  for (const [name, src] of [["frodo","/static/art/ring/track-frodo.png"],
+                             ["nazgul","/static/art/ring/track-nazgul.png"]]) {
+    const el = document.createElement("img");
+    el.src = src; el.className = "overlay" + (layer === name ? " active" : "");
+    el.id = "ov-" + name; el.draggable = false;
+    const st = S.ring[name];
+    el.style.position = "absolute"; el.style.left = st.x+"px"; el.style.top = st.y+"px";
+    el.style.transformOrigin = "0 0"; el.style.transform = `scale(${st.scale})`;
+    el.addEventListener("pointerdown", (ev) => {
+      if (cells) return; // в режиме клеток слои не перехватывают
+      ev.preventDefault(); pickLayer(name);
+      dragging = true;
+      const [sx, sy] = stageXY(ev); const ox = st.x, oy = st.y;
+      const move = (e) => { const [x,y] = stageXY(e);
+        st.x = Math.round(ox + x - sx); st.y = Math.round(oy + y - sy);
+        el.style.left = st.x+"px"; el.style.top = st.y+"px"; };
+      const up = () => { dragging = false; save();
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up); };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    });
+    el.addEventListener("wheel", (ev) => {
+      if (cells) return;
+      ev.preventDefault();
+      st.scale = Math.max(0.05, +(st.scale * (ev.deltaY < 0 ? 1.03 : 0.97)).toFixed(4));
+      el.style.transform = `scale(${st.scale})`; save();
+    });
+    stage.appendChild(el);
+  }
+  drawCellDots();
+}
+function drawCellDots() {
+  stage.querySelectorAll(".dot.cell").forEach(d => d.remove());
+  const put = (x, y, label) => { const d = document.createElement("div");
+    d.className = "dot cell"; d.style.left = x+"px"; d.style.top = y+"px";
+    d.innerHTML = `<span>${label}</span>`; stage.appendChild(d); };
+  S.ring.bg_cells.forEach((c,i) => put(c[0], c[1], "ф" + i));
+  const st = S.ring.frodo;
+  S.ring.strip_cells.forEach((c,i) => put(st.x + c[0]*st.scale, st.y + c[1]*st.scale, "п" + i));
+}
+function pickLayer(name) {
+  layer = name; cells = null;
+  document.getElementById("lay-frodo").classList.toggle("on", name === "frodo");
+  document.getElementById("lay-nazgul").classList.toggle("on", name === "nazgul");
+  document.getElementById("cells-bg").classList.remove("on");
+  document.getElementById("cells-strip").classList.remove("on");
+  stage.classList.remove("cells-mode");
+  document.querySelectorAll(".overlay").forEach(o =>
+    o.classList.toggle("active", o.id === "ov-" + name));
+  setStatus(`СЛОЙ: ${name === "frodo" ? "полоса Фродо" : "назгул"} — таскай/колесо/стрелки`, true);
+}
+function pickCells(which) {
+  cells = which; layer = null;
+  document.getElementById("lay-frodo").classList.remove("on");
+  document.getElementById("lay-nazgul").classList.remove("on");
+  document.getElementById("cells-bg").classList.toggle("on", which === "bg_cells");
+  document.getElementById("cells-strip").classList.toggle("on", which === "strip_cells");
+  stage.classList.add("cells-mode");
+  document.querySelectorAll(".overlay").forEach(o => o.classList.remove("active"));
+  setStatus(`КЛЕТКИ: ${which === "bg_cells" ? "фон" : "полоса"} — кликай центры по порядку`, true);
+}
+document.getElementById("lay-frodo").onclick = () => pickLayer("frodo");
+document.getElementById("lay-nazgul").onclick = () => pickLayer("nazgul");
+document.getElementById("cells-bg").onclick = () => pickCells("bg_cells");
+document.getElementById("cells-strip").onclick = () => pickCells("strip_cells");
+document.getElementById("cells-off").onclick = () => { cells = null;
+  stage.classList.remove("cells-mode");
+  document.getElementById("cells-bg").classList.remove("on");
+  document.getElementById("cells-strip").classList.remove("on");
+  setStatus("режим клеток выключен", false); };
+
+/* ---------- постановка клеток: по НАЖАТИЮ (pointerdown) ---------- */
+stage.addEventListener("pointerdown", (ev) => {
+  try {
+    if (mode !== "ring" || !cells) return;
+    if (ev.target.closest(".dot")) return;
+    ev.preventDefault();
+    const [x, y] = stageXY(ev);
+    let cx = x, cy = y;
+    if (cells === "strip_cells") {
+      const st = S.ring.frodo;
+      cx = (x - st.x) / st.scale; cy = (y - st.y) / st.scale;
+    }
+    S.ring[cells].push([Math.round(cx), Math.round(cy)]);
+    drawCellDots(); save();
+    setStatus(`✓ клетка №${S.ring[cells].length - 1} — кликай дальше`, true);
+  } catch (e) { setStatus("ОШИБКА: " + e.message, false); }
+}, true);
+
+/* ---------- клики по карте ---------- */
+stage.addEventListener("click", (ev) => {
+  if (dragging) return;
+  if (ev.target.closest(".dot")) return;
+  const [x, y] = stageXY(ev);
+  if (mode === "map") {
+    if (!target) { setStatus("сначала выбери цель слева!", false); return; }
+    S.map[target.region] = S.map[target.region] || {};
+    S.map[target.region][target.kind] = [Math.round(x), Math.round(y)];
+    drawMapDots(); save();
+    setStatus(`✓ ${target.region} · ${target.kind === "units" ? "юниты" : "башни"} поставлено — выбери следующую цель`, false);
+    tb.querySelectorAll("button").forEach(b => b.classList.remove("on"));
+    target = null;
+  }
+});
+
+window.addEventListener("error", (e) => setStatus("JS ОШИБКА: " + e.message, false));
+
+window.addEventListener("keydown", (ev) => {
+  if (mode !== "ring" || !layer) return;
+  const st = S.ring[layer]; const step = ev.shiftKey ? 10 : 1;
+  if (ev.key === "ArrowLeft") st.x -= step;
+  else if (ev.key === "ArrowRight") st.x += step;
+  else if (ev.key === "ArrowUp") st.y -= step;
+  else if (ev.key === "ArrowDown") st.y += step;
+  else return;
+  ev.preventDefault();
+  const el = document.getElementById("ov-" + layer);
+  el.style.left = st.x+"px"; el.style.top = st.y+"px";
+  save();
+});
+
+/* ---------- вкладки ---------- */
+function refresh() { if (mode === "map") renderMap(); else renderRing(); save(); }
+document.getElementById("tab-map").onclick = () => { mode = "map";
+  document.getElementById("tab-map").classList.add("on");
+  document.getElementById("tab-ring").classList.remove("on");
+  document.getElementById("panel-map").style.display = "";
+  document.getElementById("panel-ring").style.display = "none";
+  target = null; refresh(); };
+document.getElementById("tab-ring").onclick = () => { mode = "ring";
+  document.getElementById("tab-ring").classList.add("on");
+  document.getElementById("tab-map").classList.remove("on");
+  document.getElementById("panel-map").style.display = "none";
+  document.getElementById("panel-ring").style.display = "";
+  refresh(); };
+stage.style.transform = `scale(${zoom})`;
+refresh();
+</script>
+</body>
+</html>

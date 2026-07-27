@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Дуэль за Средиземье — прототип</title>
-<link rel="stylesheet" href="/static/style.css?v=13">
+<link rel="stylesheet" href="/static/style.css?v=27">
 </head>
 <body>
 
@@ -30,7 +30,8 @@
           <option value="1">Саурона</option>
         </select>
       </label>
-      <label class="chk"><input type="checkbox" id="promo"> промо-тайлы</label>
+      <label class="chk"><input type="checkbox" id="promo"> Промо-тайлы</label>
+      <label class="chk"><input type="checkbox" id="cb-bot"> Режим для дальтоников</label>
       <div class="lobby-btns">
         <button class="btn" id="start-bot">Начать партию</button>
         <button class="btn ghost" data-back>← Назад</button>
@@ -44,7 +45,8 @@
           <option value="1">Саурона</option>
         </select>
       </label>
-      <label class="chk"><input type="checkbox" id="pvp-promo"> промо-тайлы</label>
+      <label class="chk"><input type="checkbox" id="pvp-promo"> Промо-тайлы</label>
+      <label class="chk"><input type="checkbox" id="cb-pvp"> Режим для дальтоников</label>
       <div class="lobby-btns">
         <button class="btn" id="start-pvp">Создать комнату</button>
         <button class="btn ghost" data-back>← Назад</button>
@@ -65,6 +67,18 @@
     </div>
   </div>
 </div>
+
+<div class="modal hidden" id="confirm-modal">
+  <div class="modal-card">
+    <h2>Покинуть партию?</h2>
+    <p>Текущая партия будет оставлена. Вернуться к ней можно,<br>пока комната жива (по той же ссылке).</p>
+    <div class="lobby-btns">
+      <button class="btn" id="confirm-yes">⚔️ Выйти в лобби</button>
+      <button class="btn ghost" id="confirm-no">Остаться</button>
+    </div>
+  </div>
+</div>
+<div id="toast" class="hidden"></div>
 
 <div class="table">
 
@@ -88,6 +102,7 @@
     <section class="prompt" id="prompt" style="display:none"></section>
 
     <section class="supply-row">
+      <div class="race-vps" id="race-vps"></div>
       <div class="race-row" id="race-row"></div>
       <div class="landmark-row" id="landmark-row"></div>
     </section>
@@ -100,7 +115,7 @@
         </div>
       </div>
       <section class="board">
-        <svg id="map" viewBox="0 0 100 52"></svg>
+        <div id="map" class="map-art"></div>
       </section>
     </section>
 
@@ -119,6 +134,6 @@
   </aside>
 
 </div>
-<script src="/static/app.js?v=13"></script>
+<script src="/static/app.js?v=25"></script>
 </body>
 </html>

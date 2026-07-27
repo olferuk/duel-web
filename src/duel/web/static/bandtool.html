@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Высота бэнда</title>
+<style>
+  body { font-family: Georgia, serif; background:#241c12; color:#e8dcc0;
+         display:flex; gap:40px; padding:30px; }
+  #ctl { width: 320px; }
+  h1 { color:#d4a017; font-size:20px; }
+  #val { font-size:42px; color:#7ec97e; font-weight:bold; }
+  input[type=range] { width: 100%; }
+  .stack { width: 150px; display:flex; flex-direction:column; }
+  .stack img { width:150px; border-radius:8px; display:block;
+               box-shadow: 0 1px 5px rgba(0,0,0,.6); }
+  .stack div + div { margin-top: var(--ov); }
+  #stacks { display:flex; gap:24px; }
+  .hint { font-size:14px; opacity:.8; line-height:1.5; }
+</style>
+</head>
+<body>
+<div id="ctl">
+  <h1>Высота видимой полоски</h1>
+  <div id="val">24%</div>
+  <input type="range" id="r" min="10" max="50" step="0.5" value="24">
+  <p class="hint">Двигай ползунок, пока в стопках справа не будет видно ровно то,
+  что нужно (заголовок карты). Потом просто скажи мне число сверху.</p>
+</div>
+<div id="stacks">
+  <div class="stack" id="s1"></div>
+  <div class="stack" id="s2"></div>
+  <div class="stack" id="s3"></div>
+</div>
+<script>
+const CARDS = {
+  s1: ["c1_01","c1_05","c1_11","c2_03","c3_02"],
+  s2: ["c1_17","c2_08","c2_16","c3_18","c3_21"],
+  s3: ["c2_00","c2_10","c3_07","c3_11","c1_07"],
+};
+for (const [id, ids] of Object.entries(CARDS)) {
+  document.getElementById(id).innerHTML =
+    ids.map(c => `<div><img src="/static/art/cards/${c}.jpg"></div>`).join("");
+}
+const r = document.getElementById("r");
+function upd() {
+  const pct = parseFloat(r.value);
+  document.getElementById("val").textContent = pct + "%";
+  const h = 150 * 930 / 624; // высота карты при ширине 150
+  document.querySelectorAll(".stack").forEach(s =>
+    s.style.setProperty("--ov", `-${(h * (1 - pct / 100)).toFixed(1)}px`));
+}
+r.oninput = upd; upd();
+</script>
+</body>
+</html>

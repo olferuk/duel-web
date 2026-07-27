@@ -59,6 +59,46 @@ const TOKEN_ICONS = {
   wizards_discard_play: "🗑️▶️",
 };
 
+const TYPE_ORDER = ["grey", "yellow", "green", "red", "blue", "purple"];
+
+/* геометрия арта (analysis/ui_layout.json, разметка владельца + CV) */
+const MAPL = {
+  W: 2000, H: 1439,
+  pts: {
+    lindon: { units: [322, 357], towers: [136, 323] },
+    arnor: { units: [869, 243], towers: [685, 206] },
+    enedwaith: { units: [778, 770], towers: [593, 724] },
+    rohan: { units: [1336, 812], towers: [1147, 772] },
+    gondor: { units: [1095, 1166], towers: [911, 1123] },
+    rhovanion: { units: [1605, 372], towers: [1422, 323] },
+    mordor: { units: [1775, 1117], towers: [1585, 1081] }
+  },
+};
+const RINGL = {
+  W: 4305, H: 486,
+  frodo: { x: 80, y: 184 },   // старт полосы (offset 0)
+  nazgulY: 76,
+  stripW: 2216, stripRingX: 2096,
+  nazgulW: 273, nazgulDX: -156,
+  cellX0: 2178, cellPitch: (4202 - 2178) / 14,
+  bgCellY: 400,
+  stripCells: [[74,219],[218,219],[362,219],[507,219],[651,219],[795,219],[939,219],
+    [1083,219],[1227,219],[1371,219],[1516,219],[1660,219],[1804,219],[1948,219],[2096,213]],
+};
+
+const SPACE_TIP = {
+  empty: "Пустая клетка",
+  coin: "Бонус: +1 монета из резерва",
+  unit: "Бонус: выставь 1 юнита в любой регион (по желанию)",
+  extra_turn: "Бонус: право дополнительного хода (по желанию)",
+  destroy_fortress: "Бонус: снеси одну вражескую крепость",
+  ring: "Кольцо",
+  doom: "Роковая гора: дойдя сюда, Фродо уничтожает Кольцо — победа Братства",
+};
+
+function cbMode() { return localStorage.getItem("cbMode") === "1"; }
+function applyCbMode() { document.body.classList.toggle("cb", cbMode()); }
+
 let BOARD = null; // static regions/edges
 let G = null; // last game state
 let ROOM = null; // {id, token, seat, mode}
@@ -171,19 +211,13 @@ function cardTooltip(card) {
 }
 
 function cardFace(card, price) {
-  const give = card.gives_link
-    ? `<div class="give-link" title="даёт цепочку: ${LINK_RU[card.gives_link]}">⛓${LINK_RU[card.gives_link]}</div>`
-    : "";
-  const take = card.takes_link
-    ? `<div class="take-link" title="бесплатно при цепочке: ${LINK_RU[card.takes_link]}">⛓→ ${LINK_RU[card.takes_link]}</div>`
-    : "";
   const tag = price
     ? `<div class="price-tag ${price.affordable ? "" : "no"}">${
         price.chained ? "⛓ 0🪙" : `${price.coins}🪙`
       }</div>`
     : "";
   const pop = `<div class="card-pop">${cardTooltip(card)}</div>`;
-  return `${cardCost(card)}${give}<div class="face-body">${cardBody(card)}</div>${take}${tag}${pop}`;
+  return `<img class="card-art" draggable="false" src="/static/art/cards/${card.id}.jpg">${tag}${pop}`;
 }
 
 /* ---------- map ---------- */
@@ -229,117 +263,100 @@ function onRegionClick(r) {
 }
 
 function renderMap() {
-  if (!BOARD) return;
-  const svg = $("#map");
-  const pos = Object.fromEntries(BOARD.regions.map((r) => [r.key, r.pos]));
+  const el = $("#map");
+  if (!el) return;
   const acts = mapActions();
   if (mapSel && !acts.moves.some((m) => m.from === mapSel)) mapSel = null;
-  const lines = BOARD.edges
-    .map(([a, b]) => {
-      const [x1, y1] = pos[a];
-      const [x2, y2] = pos[b];
-      return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"
-        stroke="#7a3020" stroke-width="0.45" stroke-dasharray="1.5 1"/>`;
-    })
-    .join("");
-  const boxes = BOARD.regions
-    .map((r) => {
-      const [x, y] = r.pos;
-      const cell = G && G.board ? G.board[r.key] : { units: [0, 0], forts: [0, 0] };
-      // towers LEFT of the banner, troops RIGHT — all vertically centered on it;
-      // same anchor for both sides (art tells them apart), second side shifts outward
-      const items = [];
-      const towers = [];
-      if (cell.forts[0]) towers.push({ img: "tower0", n: cell.forts[0] });
-      if (cell.forts[1]) towers.push({ img: "tower1", n: cell.forts[1] });
-      const troops = [];
-      if (cell.units[0]) troops.push({ img: "troop0", n: cell.units[0] });
-      if (cell.units[1]) troops.push({ img: "troop1", n: cell.units[1] });
-      towers.forEach((t, i) => items.push({ ...t, w: 4.1, h: 7.0, dx: -5.6 - i * 3.9, dy: -0.6 }));
-      troops.forEach((t, i) => items.push({ ...t, w: 3.4, h: 6.6, dx: 5.4 + i * 3.4, dy: -0.6 }));
-      const markers = items
-        .map((it) => {
-          const cx = x + it.dx;
-          const cy = y + it.dy;
-          const badge =
-            it.n > 1
-              ? `<circle cx="${cx + 1.6}" cy="${cy + 2.4}" r="1.25" fill="#241c12"
-                   stroke="#e8dcc0" stroke-width="0.2"/>
-                 <text x="${cx + 1.6}" y="${cy + 3.05}" text-anchor="middle"
-                   font-size="1.8" font-weight="bold" fill="#fff">${it.n}</text>`
-              : "";
-          return `<image href="/static/icons/${it.img}.png"
-              x="${cx - it.w / 2}" y="${cy - it.h / 2}" width="${it.w}" height="${it.h}"
-              preserveAspectRatio="xMidYMid meet"/>${badge}`;
-        })
-        .join("");
-      const dsts = mapSel ? acts.moves.filter((m) => m.from === mapSel).map((m) => m.to) : [];
-      let hi = "";
-      if (acts.direct[r.key]) hi = "direct";
-      else if (mapSel === r.key) hi = "sel";
-      else if (mapSel && dsts.includes(r.key)) hi = "dst";
-      else if (!mapSel && acts.moves.some((m) => m.from === r.key)) hi = "src";
-      const halo = hi
-        ? `<ellipse cx="${x}" cy="${y - 0.6}" rx="8.6" ry="6.6" class="map-hi ${hi}"/>`
-        : "";
-      const clickable = hi ? `data-clickable="1"` : "";
-      return `
-        <g data-region="${r.key}" ${clickable}>
-          <title>${r.name}</title>
-          ${halo}
-          <image href="/static/icons/${r.key}.png" x="${x - 2.2}" y="${y - 5.0}"
-            width="4.4" height="8.8" preserveAspectRatio="xMidYMid meet"/>
-          <text x="${x}" y="${y + 6.3}" text-anchor="middle" font-size="2"
-            font-weight="bold" fill="#4a3820" letter-spacing="0.2">${r.name}</text>
-          ${markers}
-        </g>`;
-    })
-    .join("");
-  svg.innerHTML = lines + boxes;
-  svg.querySelectorAll("g[data-clickable]").forEach((g) =>
-    g.addEventListener("click", (ev) => {
+  const P = (x, y) => `left:${(x / MAPL.W) * 100}%;top:${(y / MAPL.H) * 100}%`;
+  let h = `<img class="map-bg" draggable="false" src="/static/art/map.jpg">`;
+
+  // плашки присутствия в углах
+  if (G && G.players) {
+    h += `<div class="map-vp f" title="${SIDE_RU[0]}: присутствие (7 — победа покорением)">${G.players[0].presence} / 7</div>`;
+    h += `<div class="map-vp s" title="${SIDE_RU[1]}: присутствие (7 — победа покорением)">${G.players[1].presence} / 7</div>`;
+  }
+
+  for (const r of (BOARD ? BOARD.regions : [])) {
+    const pts = MAPL.pts[r.key];
+    if (!pts) continue;
+    const cell = G && G.board ? G.board[r.key] : { units: [0, 0], forts: [0, 0] };
+    // подсветка/кликабельность
+    const dsts = mapSel ? acts.moves.filter((m) => m.from === mapSel).map((m) => m.to) : [];
+    let hi = "";
+    if (acts.direct[r.key]) hi = "direct";
+    else if (mapSel === r.key) hi = "sel";
+    else if (mapSel && dsts.includes(r.key)) hi = "dst";
+    else if (!mapSel && acts.moves.some((m) => m.from === r.key)) hi = "src";
+    const cx = (pts.units[0] + pts.towers[0]) / 2;
+    const cy = (pts.units[1] + pts.towers[1]) / 2;
+    h += `<div class="map-zone ${hi}" data-region="${r.key}" ${hi ? 'data-clickable="1"' : ""}
+       style="${P(cx, cy)}" title="${r.name}"></div>`;
+    // башни (слева-точка) и юниты (справа-точка): обе стороны на своей точке,
+    // вторая сторона сдвигается, чтобы не наезжать
+    const marks = [];
+    if (cell.forts[0]) marks.push(["tower0", cell.forts[0], pts.towers, -1]);
+    if (cell.forts[1]) marks.push(["tower1", cell.forts[1], pts.towers, 1]);
+    if (cell.units[0]) marks.push(["troop0", cell.units[0], pts.units, -1]);
+    if (cell.units[1]) marks.push(["troop1", cell.units[1], pts.units, 1]);
+    for (const [img, n, pt, side] of marks) {
+      const both = (img.startsWith("tower") ? cell.forts[0] && cell.forts[1] : cell.units[0] && cell.units[1]);
+      const dx = both ? side * 34 : 0;
+      const w = img.startsWith("tower") ? 3.4 : 3.4; // солдатики +20%
+      h += `<div class="map-mark ${img.startsWith("troop") ? "troop" : "tower"}" style="${P(pt[0] + dx, pt[1])};width:${w}%">
+        <img draggable="false" src="/static/icons/${img}.png">
+        ${n > 1 ? `<b>${n}</b>` : ""}</div>`;
+    }
+  }
+  el.innerHTML = h;
+  el.querySelectorAll("[data-clickable]").forEach((z) =>
+    z.addEventListener("click", (ev) => {
       ev.stopPropagation();
-      onRegionClick(g.dataset.region);
+      onRegionClick(z.dataset.region);
     })
   );
 }
 
 /* ---------- quest ---------- */
 
-const SPACE_ICONS = {
-  empty: "", coin: "🪙", unit: "⚔️", extra_turn: "🔄",
-  destroy_fortress: "💥", ring: "💍", doom: "🌋",
-};
-const QSTEP = 44;
-
-function questCells(strip, figureAt, figure) {
-  return strip
-    .map((kind, i) => {
-      const cls = ["quest-space", kind !== "empty" ? "bonus" : "", kind === "doom" ? "doom" : ""]
-        .filter(Boolean)
-        .join(" ");
-      const who = i === figureAt ? `<span class="who">${figure}</span>` : "";
-      return `<div class="${cls}"><span class="icon">${SPACE_ICONS[kind]}</span>${who}</div>`;
-    })
-    .join("");
-}
-
 function renderQuest(q) {
-  const width = 29 * QSTEP + 20;
-  $("#quest-track").innerHTML = coinify(`
-    <div class="quest-rows" style="width:${width}px">
-      <div class="strip nazgul-strip" style="left:${q.strip_offset * QSTEP}px">
-        ${questCells(q.nazgul_strip, q.nazgul_progress, "🏇")}
-      </div>
-      <div class="strip frodo-strip" style="left:${14 * QSTEP + 6}px">
-        ${questCells(q.frodo_strip, q.frodo - 14, "🧝")}
-      </div>
-    </div>`);
+  const fLeft = 28 - q.frodo;
+  const sLeft = q.gap;
+  const offset = q.strip_offset; // 0..14 — на сколько клеток уехала полоса Фродо
+  const nazgulGlobal = q.nazgul_global; // 0..28
+  const px = (v) => (v / RINGL.W) * 100; // проценты ширины панорамы
+  const stripX = RINGL.cellX0 + offset * RINGL.cellPitch - RINGL.stripRingX;
+  const nazX = RINGL.cellX0 + (nazgulGlobal - 14) * RINGL.cellPitch + RINGL.nazgulDX;
+  $("#quest-track").innerHTML = `
+    <div class="ring-art">
+      <img class="ring-bg" draggable="false" src="/static/art/ring/track-bg.jpg">
+      <img class="ring-strip" draggable="false" src="/static/art/ring/track-frodo.png"
+        style="left:${px(stripX)}%;top:${(RINGL.frodo.y / RINGL.H) * 100}%;width:${px(RINGL.stripW)}%">
+      <img class="ring-nazgul" draggable="false" src="/static/art/ring/track-nazgul.png"
+        style="left:${px(nazX)}%;top:${(RINGL.nazgulY / RINGL.H) * 100}%;width:${px(RINGL.nazgulW)}%">
+      ${q.frodo_strip.map((kind, i) => {
+        const cx = RINGL.cellX0 + i * RINGL.cellPitch;
+        const tip = i === 0 ? "Старт Фродо" : SPACE_TIP[kind] || kind;
+        return `<div class="ring-zone" title="Путь Фродо, клетка ${i}: ${tip}"
+          style="left:${px(cx)}%;top:${(RINGL.bgCellY / RINGL.H) * 100}%"></div>`;
+      }).join("")}
+      ${q.nazgul_strip.map((kind, i) => {
+        const [cx, cy] = RINGL.stripCells[i];
+        const tip = kind === "ring"
+          ? "Кольцо: здесь назгул настигает Фродо — победа Саурона"
+          : SPACE_TIP[kind] || kind;
+        return `<div class="ring-zone naz" title="Путь назгула, клетка ${i}: ${tip}"
+          style="left:${px(stripX + cx)}%;top:${((RINGL.frodo.y + cy) / RINGL.H) * 100}%"></div>`;
+      }).join("")}
+    </div>
+    <div class="quest-vp">
+      <div class="race-vp s" title="Саурону осталось шагов, чтобы настичь Фродо">🏇 ещё ${sLeft}</div>
+      <div class="race-vp f" title="Братству осталось шагов до Роковой горы (победа Кольцом)">🧝 ещё ${fLeft}</div>
+    </div>`;
 }
 
 /* ---------- tableau ---------- */
 
-const CARD_W = 116, CARD_H = 166;
+const CARD_W = 124, CARD_H = 185; // пропорции арта 624×930, +7% за счёт ужатого трека
 const UNIT_X = CARD_W / 2 + 5; // a bit of air between same-row cards
 const STEP_Y = Math.round(CARD_H * 0.5); // moderate vertical overlap
 
@@ -401,21 +418,15 @@ document.addEventListener("click", closeChooser);
 function soldGroups(open) {
   const byType = {};
   for (const c of open) (byType[c.type] = byType[c.type] || []).push(c);
-  return Object.entries(byType)
-    .map(([t, cards]) => {
-      const counts = {};
-      for (const c of cards) {
-        const k = `${miniLabel(c)} ${pileLabel(c)}`.trim();
-        counts[k] = (counts[k] || 0) + 1;
-      }
-      return (
-        `<div class="mini-group t-${t}">` +
-        Object.entries(counts)
-          .map(([k, n]) => `<div class="mini-card">${k}${n > 1 ? ` ×${n}` : ""}</div>`)
+  return TYPE_ORDER.filter((t) => byType[t])
+    .map(
+      (t) =>
+        `<div class="sold-row">` +
+        byType[t]
+          .map((c) => `<img class="sold-thumb" src="/static/art/cards/${c.id}.jpg" title="${c.type}">`)
           .join("") +
         `</div>`
-      );
-    })
+    )
     .join("");
 }
 
@@ -430,8 +441,8 @@ function renderPiles() {
   const open = G.discard_open || [];
   $("#piles").innerHTML = coinify(`
     <div class="pile facedown-pile"
-      title="Закрытый сброс: ${G.discard_hidden} карт (по 3 не вошли в каждую эпоху)">
-      <span class="pile-num">${G.discard_hidden}</span><span class="pile-cap">закрыто</span>
+      title="Отложены из игры при сетапе эпох (по 3 закрытых): в сброс не входят и в игру не вернутся">
+      <span class="pile-num">${G.discard_hidden}</span><span class="pile-cap">вне игры</span>
     </div>
     <div class="pile open-pile ${open.length ? "clickable" : ""}"
       title="Проданные и снятые карты — кликни, чтобы посмотреть">
@@ -501,22 +512,19 @@ function renderLandmarks() {
         const tag = lm.price
           ? `<div class="price-tag ${lm.price.affordable ? "" : "no"}">${lm.price.coins}🪙</div>`
           : "";
-        return `<div class="tile faceup ${m ? "buyable" : ""}" data-tile="${lm.id}">
-          <div class="tile-body">
-            <b>${lm.name}</b>
-            <span class="tile-cost">${lm.cost.map((s) => SKILL_ICONS[s]).join("")}</span>
-            <span class="tile-eff${eff.join(" ").length > 12 ? " sm" : ""}">${eff.join(" ")}</span>
-          </div>${tag}
-          <div class="lm-pop">${LM_TEXT[lm.id] || ""}
-            <div class="lm-pop-note">Доплата: +1🪙 за каждую свою крепость на карте</div>
+        return `<div class="tile art ${m ? "buyable" : ""}" data-tile="${lm.id}">
+          <img draggable="false" src="/static/art/landmarks/${lm.id}.jpg">
+          ${tag}
+          <div class="lm-pop"><b>${lm.name}</b><br>${LM_TEXT[lm.id] || ""}
+            <div class="lm-pop-note">Эффекты: ${eff.join(" ")} · Доплата: +1🪙 за каждую свою крепость</div>
           </div>
         </div>`;
       })
       .join("") || '<div class="area-hint">нет открытых тайлов</div>');
   if (G.landmarks_deck > 0)
     $("#landmark-row").innerHTML +=
-      `<div class="tile stack"><b>Стопка</b><span class="stack-count">×${G.landmarks_deck}</span>` +
-      `<span class="tile-eff">закрытые тайлы</span></div>`;
+      `<div class="tile art stack" title="Закрытые тайлы в стопке">` +
+      `<img draggable="false" src="/static/art/landmarks/_back.jpg"><small>×${G.landmarks_deck}</small></div>`;
   document.querySelectorAll(".tile.buyable").forEach((t) =>
     t.addEventListener("click", () => doMove(movesByTile[t.dataset.tile]))
   );
@@ -525,6 +533,11 @@ function renderLandmarks() {
 const RACE_ORDER = ["elves", "hobbits", "humans", "dwarves", "ents", "wizards"];
 
 function renderRaces() {
+  const raceChip = (i) =>
+    `<div class="race-vp ${i ? "s" : "f"}"
+       title="${SIDE_RU[i]}: рас в поддержке (6 — победа по расам)">
+       ${i ? "🏇" : "🧝"} ${G.players[i].race_victory_count}/6</div>`;
+  $("#race-vps").innerHTML = raceChip(0) + raceChip(1);
   $("#race-row").innerHTML = RACE_ORDER.filter((r) => r in G.alliance_stacks)
     .map((race) => {
       const st = G.alliance_stacks[race];
@@ -534,16 +547,14 @@ function renderRaces() {
         ? `<div class="race-pop"><b>В стопке (порядок неизвестен):</b>${tokens
             .map(
               (t) =>
-                `<div class="race-pop-chip"><span class="tok-ico">${TOKEN_ICONS[t.id] || "❔"}</span>
+                `<div class="race-pop-chip"><img class="tok-art" src="/static/art/tokens/${t.id}.png">
                  <span class="tok-txt">${t.text}</span></div>`
             )
             .join("")}</div>`
         : "";
-      const instant = race === "ents" || race === "wizards" ? " instant" : "";
-      return `<div class="race-token${instant}">
-        <span class="race-ico">${RACE_ICONS[race]}</span>
-        <span>${RACE_RU[race]}</span>
-        <small>жетонов: ${n}</small>${pop}
+      return `<div class="race-token-art">
+        <img draggable="false" src="/static/art/tokens/_back_${race}.png">
+        <small>×${n}</small>${pop}
       </div>`;
     })
     .join("");
@@ -555,18 +566,15 @@ function renderPanels() {
     const el = document.querySelector(`#panel-${i} .panel-body`);
     const byType = {};
     for (const c of pl.played) (byType[c.type] = byType[c.type] || []).push(c);
-    const cardsHtml = Object.entries(byType)
+    const cardsHtml = TYPE_ORDER.filter((t) => byType[t])
       .map(
-        ([t, cards]) =>
-          `<div class="mini-group t-${t}">` +
-          cards
+        (t) =>
+          `<div class="stack-col">` +
+          byType[t]
             .map(
               (c) =>
-                `<div class="mini-card">${miniLabel(c)}${
-                  c.gives_link
-                    ? ` <span class="chain-mini">⛓${LINK_RU[c.gives_link]}</span>`
-                    : ""
-                }</div>`
+                `<div class="stk"><img draggable="false" src="/static/art/cards/${c.id}.jpg">
+                 <div class="card-pop">${cardTooltip(c)}</div></div>`
             )
             .join("") +
           `</div>`
@@ -576,10 +584,30 @@ function renderPanels() {
       <div class="coins">🪙 ${pl.coins}</div>
       <div class="stat">регионов: ${pl.presence} / 7 · рас: ${pl.race_victory_count} / 6</div>
       <div class="stat">юнитов в запасе: ${pl.supply}</div>
-      ${pl.tokens.length ? `<div class="tokens">${pl.tokens.map((t) => `<div class="token ${t.kind === "instant" ? "used" : ""}" title="${t.text}"><span class="tok-ico">${RACE_ICONS[t.race]} ${TOKEN_ICONS[t.id] || ""}</span> ${t.text}${t.kind === "instant" ? " <i>(использован)</i>" : ""}</div>`).join("")}</div>` : ""}
-      <div class="mini-cards">${cardsHtml}</div>
+      ${pl.tokens.length ? `<div class="tokens-art">${pl.tokens.map((t) => `<img class="tok-art ${t.kind === "instant" ? "used" : ""}" src="/static/art/tokens/${t.id}.png" title="${t.text}${t.kind === "instant" ? " (использован)" : ""}">`).join("")}</div>` : ""}
+      <div class="stacks">${cardsHtml}</div>
       ${pl.last_action ? `<div class="last-action">${pl.last_action}</div>` : ""}`);
-    document.getElementById(`panel-${i}`).classList.toggle("active", G.current === i && !G.winner);
+    const panel = document.getElementById(`panel-${i}`);
+    panel.classList.toggle("active", G.current === i && !G.winner);
+    const ended = G.winner !== null && G.winner !== undefined;
+    panel.classList.toggle("won", ended && G.winner === i);
+    panel.classList.toggle("lost", ended && G.winner === 1 - i);
+    let badge = "";
+    if (ended && G.winner === i) badge = '<div class="result-badge win">🏆 ПОБЕДА! 🎉</div>';
+    else if (ended && G.winner === 1 - i) badge = '<div class="result-badge lose">💀 Поражение</div>';
+    else if (ended) badge = '<div class="result-badge draw">🤝 Ничья</div>';
+    el.insertAdjacentHTML("afterbegin", badge);
+  }
+}
+
+const WIN_GLOW = { quest: ".quest", races: ".supply-row", conquest: ".mid-row .board", presence: ".mid-row .board" };
+
+function renderWinGlow() {
+  document.querySelectorAll(".vp-glow").forEach((e) => e.classList.remove("vp-glow"));
+  if (G && G.winner !== null && G.winner !== undefined && G.winner !== "draw") {
+    const sel = WIN_GLOW[G.win_reason];
+    const el = sel && document.querySelector(sel);
+    if (el) el.classList.add("vp-glow");
   }
 }
 
@@ -669,6 +697,7 @@ function renderAll() {
   renderQuest(G.quest);
   renderTableau();
   renderLog();
+  renderWinGlow();
 }
 
 /* ---------- rooms: bot / pvp / hotseat ---------- */
@@ -726,7 +755,7 @@ async function doMove(m) {
     renderAll();
     await botIfNeeded();
   } catch (e) {
-    alert("Ход отклонён: " + e.message);
+    toast("Ход отклонён: " + e.message);
   }
 }
 
@@ -779,6 +808,21 @@ function startPolling() {
   }, 1300);
 }
 
+for (const id of ["cb-bot", "cb-pvp"]) {
+  const el = document.getElementById(id);
+  if (!el) continue;
+  el.checked = cbMode();
+  el.addEventListener("change", () => {
+    localStorage.setItem("cbMode", el.checked ? "1" : "0");
+    for (const other of ["cb-bot", "cb-pvp"]) {
+      const o = document.getElementById(other);
+      if (o) o.checked = el.checked;
+    }
+    applyCbMode();
+  });
+}
+applyCbMode();
+
 $("#lobby-bot").addEventListener("click", () => showSection("lobby-bot-opts"));
 $("#lobby-pvp").addEventListener("click", () => showSection("lobby-pvp-opts"));
 document.querySelectorAll("[data-back]").forEach((b) =>
@@ -787,12 +831,18 @@ document.querySelectorAll("[data-back]").forEach((b) =>
 
 $("#start-bot").addEventListener("click", async () => {
   const sel = $("#bot-diff");
-  const resp = await post("/api/room/new", {
+  let resp;
+  try {
+    resp = await post("/api/room/new", {
     mode: "bot",
     bot: sel.value || "mcts",
     side: Number($("#side-select").value),
     promo: $("#promo").checked,
   });
+  } catch (e) {
+    toast("Не удалось создать партию: " + e.message);
+    return;
+  }
   setRoom(resp);
   ROOM.botLabel = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : sel.value;
   $("#room-info").textContent = `против бота: ${ROOM.botLabel}`;
@@ -832,8 +882,23 @@ async function joinRoom(rid) {
   }
 }
 
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.remove("hidden");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => t.classList.add("hidden"), 3500);
+}
+
 $("#to-lobby").addEventListener("click", () => {
-  if (!G || G.winner !== null || confirm("Выйти из партии в лобби?")) location.href = "/";
+  if (!G || G.winner !== null) { location.href = "/"; return; }
+  $("#confirm-modal").classList.remove("hidden");
+});
+$("#confirm-yes").addEventListener("click", () => (location.href = "/"));
+$("#confirm-no").addEventListener("click", () =>
+  $("#confirm-modal").classList.add("hidden"));
+$("#confirm-modal").addEventListener("click", (ev) => {
+  if (ev.target.id === "confirm-modal") $("#confirm-modal").classList.add("hidden");
 });
 
 (async function init() {
