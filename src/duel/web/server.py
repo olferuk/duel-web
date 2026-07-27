@@ -117,9 +117,14 @@ def get_game() -> dict:
 
 BOT_MENU = [
     {
+        "id": "galadriel",
+        "label": "👑 Галадриэль · ELO ≈1470 · ЧЕМПИОНКА",
+        "desc": "Владычица Лориэна и действующая чемпионка: сила через союзы шести рас (MCTS-240)",
+    },
+    {
         "id": "champion",
-        "label": "👑 Гэндальф · ELO ≈1380",
-        "desc": "Чемпион: глубокий поиск (MCTS-240) + нейросеть w3. Честный, без подглядываний",
+        "label": "Гэндальф · ELO ≈1350",
+        "desc": "Экс-чемпион: глубокий поиск (MCTS-240) + нейросеть w3. Честный, без подглядываний",
     },
     {
         "id": "strong",
@@ -140,11 +145,6 @@ BOT_MENU = [
         "id": "witch_king",
         "label": "Король-чародей · ELO ≈1245 · стиль: война",
         "desc": "Агрессор: армии, крепости и захват регионов прежде всего",
-    },
-    {
-        "id": "galadriel",
-        "label": "Галадриэль · ELO ≈1340 · стиль: союзы",
-        "desc": "Дипломат: собирает поддержку всех шести рас Средиземья",
     },
     {
         "id": "gollum",
@@ -246,7 +246,15 @@ def _make_bot(kind: str, seed: int = 7):
         return HonestMctsBot(sims=120, seed=seed, name=kind, eval_fn=_net_eval("w3"), worlds=4)
     if kind == "mcts":
         return HonestMctsBot(sims=150, seed=seed, name="mcts150-heur", leaf="heuristic", worlds=4)
-    if kind in ("frodo", "witch_king", "galadriel", "gollum"):
+    if kind == "galadriel":
+        try:
+            ev = _net_eval("p_galadriel")
+        except Exception:
+            from duel.ai.personality import personality_eval
+
+            ev = personality_eval(_get_net("w3"), "galadriel")
+        return HonestMctsBot(sims=240, seed=seed, name=kind, eval_fn=ev, worlds=4)
+    if kind in ("frodo", "witch_king", "gollum"):
         # предпочитаем персонально обученную сеть p_<kind>; до её появления —
         # базовая w3 с наклоном оценки к стилю персонажа
         try:
