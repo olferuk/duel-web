@@ -32,11 +32,29 @@ def _coins_metric(g: Game, p: int) -> float:
     return min(g.players[p].coins, 16) / 16.0
 
 
+def _presence_metric(g: Game, p: int) -> float:
+    return sum(
+        1 for r in REGION_KEYS if g.board_units[r][p] > 0 or g.board_forts[r][p] > 0
+    ) / 7.0
+
+
+def _chains_metric(g: Game, p: int) -> float:
+    return min(len(g.players[p].links), 8) / 8.0
+
+
+def _deny_races_metric(g: Game, p: int) -> float:
+    # «души чужие союзы»: моя метрика — НЕхватка рас у соперника
+    return 1.0 - g.players[1 - p].race_symbols_for_victory() / 6.0
+
+
 PROFILES = {
     "frodo": _quest_metric,
     "witch_king": _war_metric,
     "galadriel": _races_metric,
     "gollum": _coins_metric,
+    "presence": _presence_metric,
+    "chains": _chains_metric,
+    "deny": _deny_races_metric,
 }
 
 
