@@ -203,9 +203,8 @@ def _get_bot(kind: str):
 _NETS: dict = {}
 
 
-def _net_eval(model: str):
-    from duel.engine.encoding import encode
-
+def _get_net(model: str):
+    """Net-like with .values(); torch checkpoint or ONNX depending on the image."""
     if model not in _NETS:
         if os.environ.get("DUEL_ONNX") == "1":
             from duel.ai.onnx_net import OnnxValueNet
@@ -220,7 +219,13 @@ def _net_eval(model: str):
                 from duel.ai.onnx_net import OnnxValueNet
 
                 _NETS[model] = OnnxValueNet(model)
-    net = _NETS[model]
+    return _NETS[model]
+
+
+def _net_eval(model: str):
+    from duel.engine.encoding import encode
+
+    net = _get_net(model)
 
     def ev(state):
         return float(net.values(encode(state, 0)[None, :])[0])
@@ -246,13 +251,10 @@ def _make_bot(kind: str, seed: int = 7):
         # базовая w3 с наклоном оценки к стилю персонажа
         try:
             ev = _net_eval(f"p_{kind}")
-        except Exception:
+        except Exception:  # персональной сети ещё нет — базовая w3 с наклоном
             from duel.ai.personality import personality_eval
-            from duel.ai.value_net import ValueNet
 
-            if "w3" not in _NETS:
-                _NETS["w3"] = ValueNet.load("w3")
-            ev = personality_eval(_NETS["w3"], kind)
+            ev = personality_eval(_get_net("w3"), kind)
         return HonestMctsBot(sims=120, seed=seed, name=kind, eval_fn=ev, worlds=4)
     if kind == "2ply":
         from duel.ai.bots import TwoPlyBot
