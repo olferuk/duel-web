@@ -64,6 +64,12 @@ const TYPE_ORDER = ["grey", "yellow", "green", "red", "blue", "purple"];
 /* геометрия арта (analysis/ui_layout.json, разметка владельца + CV) */
 const MAPL = {
   W: 2000, H: 1439,
+  zoneRadius: 40,
+  zones: {
+    lindon: [187, 292, 284, 192], arnor: [737, 176, 287, 193], rhovanion: [1476, 297, 284, 195],
+    enedwaith: [645, 695, 287, 196], rohan: [1200, 741, 288, 199], gondor: [965, 1099, 284, 194],
+    mordor: [1640, 1053, 281, 195],
+  },
   pts: {
     lindon: { units: [322, 357], towers: [136, 323] },
     arnor: { units: [869, 243], towers: [685, 206] },
@@ -287,10 +293,14 @@ function renderMap() {
     else if (mapSel === r.key) hi = "sel";
     else if (mapSel && dsts.includes(r.key)) hi = "dst";
     else if (!mapSel && acts.moves.some((m) => m.from === r.key)) hi = "src";
-    const cx = (pts.units[0] + pts.towers[0]) / 2;
-    const cy = (pts.units[1] + pts.towers[1]) / 2;
+    const z = MAPL.zones[r.key]; // [x, y, w, h] в пространстве карты — реальная табличка региона
+    // правые углы скруглены общим радиусом (левые прямые); радиус в % от размеров зоны
+    const rh = ((MAPL.zoneRadius / z[2]) * 100).toFixed(1);
+    const rv = ((MAPL.zoneRadius / z[3]) * 100).toFixed(1);
     h += `<div class="map-zone ${hi}" data-region="${r.key}" ${hi ? 'data-clickable="1"' : ""}
-       style="${P(cx, cy)}" title="${r.name}"></div>`;
+       style="left:${(z[0] / MAPL.W) * 100}%;top:${(z[1] / MAPL.H) * 100}%;
+       width:${(z[2] / MAPL.W) * 100}%;height:${(z[3] / MAPL.H) * 100}%;
+       border-radius:0 ${rh}% ${rh}% 0 / 0 ${rv}% ${rv}% 0" title="${r.name}"></div>`;
     // башни (слева-точка) и юниты (справа-точка): обе стороны на своей точке,
     // вторая сторона сдвигается, чтобы не наезжать
     const marks = [];
@@ -347,11 +357,10 @@ function renderQuest(q) {
         return `<div class="ring-zone naz" title="Путь назгула, клетка ${i}: ${tip}"
           style="left:${px(stripX + cx)}%;top:${((RINGL.frodo.y + cy) / RINGL.H) * 100}%"></div>`;
       }).join("")}
-    </div>
-    <div class="quest-vp">
-      <div class="race-vp s" title="Саурону осталось шагов, чтобы настичь Фродо">🏇 ещё ${sLeft}</div>
-      <div class="race-vp f" title="Братству осталось шагов до Роковой горы (победа Кольцом)">🧝 ещё ${fLeft}</div>
     </div>`;
+  $("#quest-vp").innerHTML =
+    `<div class="race-vp s" title="Саурону осталось шагов, чтобы настичь Фродо">🏇 ещё ${sLeft}</div>` +
+    `<div class="race-vp f" title="Братству осталось шагов до Роковой горы (победа Кольцом)">🧝 ещё ${fLeft}</div>`;
 }
 
 /* ---------- tableau ---------- */
@@ -373,8 +382,8 @@ function renderTableau() {
   const minX = Math.min(...xs), maxX = Math.max(...xs);
   const width = (maxX - minX) * UNIT_X + CARD_W + 40;
   const height = Math.max(...state.slots.map((s) => s.row)) * STEP_Y + CARD_H + 30;
-  el.style.minHeight = height + "px";
-  const cx = Math.max(el.clientWidth, width) / 2;
+  const isMobile = window.innerWidth <= 820;
+  const cx = isMobile ? width / 2 : Math.max(el.clientWidth, width) / 2;
 
   el.innerHTML = coinify(state.slots
     .filter((s) => !s.taken)
@@ -403,6 +412,20 @@ function renderTableau() {
       showChooser(c, movesBySlot[c.dataset.slot]);
     })
   );
+
+  // мобильный масштаб: крупные карты + горизонтальный свайп, если шире экрана.
+  // zoom (в отличие от transform) меняет и layout-бокс → работает нативный скролл.
+  if (isMobile) {
+    const avail = el.parentElement.clientWidth - 4;
+    const fit = Math.min(1, Math.max(avail / width, 0.6)); // не мельче 60%
+    el.style.width = width + "px";
+    el.style.zoom = fit;
+    el.style.minHeight = height + "px";
+  } else {
+    el.style.zoom = "";
+    el.style.width = "";
+    el.style.minHeight = height + "px";
+  }
 }
 
 let chooserEl = null;
@@ -459,6 +482,127 @@ function renderPiles() {
     });
 }
 
+/* ---------- мобильный tap-попап с клампом по краям экрана ---------- */
+let popEl = null, popAnchor = null;
+function hidePopover() {
+  if (popEl) { popEl.remove(); popEl = null; popAnchor = null; }
+}
+let _tileBuy = {};
+
+/* Единый мобильный tap-попап: тултип сверху + экшен-меню снизу (карты, ландмарки,
+   клетки трека, стопки рас) — однородно везде. */
+function mobileMenu(anchor, tooltipHtml, actions) {
+  hidePopover();
+  popEl = document.createElement("div");
+  popEl.className = "m-popover m-menu";
+  popAnchor = anchor;
+  let html = tooltipHtml ? `<div class="pop-tip">${tooltipHtml}</div>` : "";
+  if (actions && actions.length) html += `<div class="pop-acts"></div>`;
+  popEl.innerHTML = coinify(html);
+  document.body.appendChild(popEl);
+  if (actions && actions.length) {
+    const box = popEl.querySelector(".pop-acts");
+    for (const a of actions) {
+      const btn = document.createElement("button");
+      btn.className = "btn small";
+      btn.innerHTML = coinify(a.label);
+      btn.addEventListener("click", (ev) => { ev.stopPropagation(); hidePopover(); a.fn(); });
+      box.appendChild(btn);
+    }
+  }
+  positionPopover(anchor);
+}
+function positionPopover(anchor) {
+  const r = anchor.getBoundingClientRect();
+  const pw = popEl.offsetWidth, ph = popEl.offsetHeight;
+  let left = r.left + r.width / 2 - pw / 2 + window.scrollX;
+  left = Math.max(6, Math.min(left, window.innerWidth - pw - 6));
+  let top = r.top - ph - 8 > 0 ? r.top - ph - 8 + window.scrollY : r.bottom + 8 + window.scrollY;
+  top = Math.max(6 + window.scrollY, Math.min(top, window.scrollY + window.innerHeight - ph - 6));
+  popEl.style.left = left + "px";
+  popEl.style.top = top + "px";
+}
+
+document.addEventListener("click", (e) => {
+  if (window.innerWidth > 820) return; // десктоп не трогаем
+  if (popEl && popEl.contains(e.target)) return;
+
+  const card = e.target.closest("#tableau .card.faceup, .hand-card .stk");
+  if (card) {
+    e.stopPropagation();
+    const inTableau = card.closest("#tableau");
+    let cardObj = null, actions = [];
+    if (inTableau) {
+      const slot = G.tableau.slots.find((s) => String(s.id) === card.dataset.slot);
+      cardObj = slot && slot.card;
+      const moves = canAct()
+        ? G.moves.filter(
+            (m) =>
+              ["play", "discard", "shire_pick"].includes(m.type) &&
+              String(m.slot) === card.dataset.slot
+          )
+        : [];
+      actions = moves.map((m) => ({ label: shortLabel(m), fn: () => doMove(m) }));
+    } else {
+      const pop = card.querySelector(".card-pop");
+      mobileMenu(card, pop ? pop.innerHTML : "", []);
+      return;
+    }
+    if (cardObj) mobileMenu(card, cardTooltip(cardObj), actions);
+    return;
+  }
+
+  const tile = e.target.closest(".tile.art");
+  if (tile && !tile.classList.contains("stack")) {
+    e.stopPropagation();
+    const id = tile.dataset.tile;
+    const tip = tile.querySelector(".lm-pop");
+    const actions = _tileBuy[id]
+      ? [{
+          label: `Купить ${_tileBuy[id].label.match(/\((.+)\)/)?.[1] || ""}`,
+          fn: () => doMove(_tileBuy[id]),
+        }]
+      : [];
+    mobileMenu(tile, tip ? tip.innerHTML : "", actions);
+    return;
+  }
+
+  const cell = e.target.closest(".ring-zone");
+  if (cell) {
+    const t = cell.getAttribute("title") || "";
+    if (/Пустая клетка|Старт/.test(t)) { hidePopover(); return; } // пустая клетка — без тултипа
+    e.stopPropagation();
+    mobileMenu(cell, t, []);
+    return;
+  }
+
+  const tok = e.target.closest(".race-token-art");
+  if (tok) {
+    e.stopPropagation();
+    const pop = tok.querySelector(".race-pop");
+    mobileMenu(tok, pop ? pop.innerHTML : "<b>Стопка пуста</b>", []);
+    return;
+  }
+
+  const dtok = e.target.closest(".dock-tok");
+  if (dtok) {
+    e.stopPropagation();
+    const tip = dtok.querySelector(".tok-tip");
+    mobileMenu(dtok, tip ? tip.innerHTML : "", []);
+    return;
+  }
+
+  if (popEl && !popEl.contains(e.target)) hidePopover();
+}, true);
+
+function shortLabel(m) {
+  if (m.type === "play")
+    return m.chained ? "▶ Сыграть ⛓ 0🪙" : `▶ Сыграть ${m.cost}🪙`;
+  if (m.type === "discard") return `🗑 Продать +${m.gain}🪙`;
+  if (m.type === "shire_pick") return `Шир ${m.cost != null ? m.cost + "🪙" : ""}`;
+  return m.label;
+}
+
 function showChooser(anchor, moves) {
   closeChooser();
   chooserEl = document.createElement("div");
@@ -466,7 +610,7 @@ function showChooser(anchor, moves) {
   for (const m of moves) {
     const b = document.createElement("button");
     b.className = "btn small";
-    b.innerHTML = coinify(m.label);
+    b.innerHTML = coinify(shortLabel(m));
     b.addEventListener("click", async (ev) => {
       ev.stopPropagation();
       closeChooser();
@@ -525,6 +669,8 @@ function renderLandmarks() {
     $("#landmark-row").innerHTML +=
       `<div class="tile art stack" title="Закрытые тайлы в стопке">` +
       `<img draggable="false" src="/static/art/landmarks/_back.jpg"><small>×${G.landmarks_deck}</small></div>`;
+  _tileBuy = movesByTile;
+  // покупка тайла — коротким тапом/кликом (тултип — по долгому нажатию)
   document.querySelectorAll(".tile.buyable").forEach((t) =>
     t.addEventListener("click", () => doMove(movesByTile[t.dataset.tile]))
   );
@@ -646,46 +792,84 @@ function renderTurn() {
   }
   $("#reserve").textContent = `🪙 резерв: ${G.reserve}`;
 
+  renderPrompt();
+}
+
+const MAP_TYPES = ["place", "move", "kill", "retreat"]; // управляются кликами по карте
+let _mapPendingKey = null;
+
+function renderPrompt() {
   const pr = $("#prompt");
-  const pendingMoves = canAct()
+  const all = canAct()
     ? G.moves.filter((m) => !["play", "discard", "tile", "shire_pick"].includes(m.type))
     : [];
-  if (G.pending && pendingMoves.length) {
-    const why = G.pending.why ? ` (${G.pending.why})` : "";
-    pr.style.display = "";
-    const isDiscard = G.pending.type === "play_from_discard";
-    pr.innerHTML =
-      `<div class="prompt-title">${SIDE_RU[G.pending.player]} — ${isDiscard ? "сыграй бесплатно любую проданную карту" : "выбор" + why}:</div>` +
-      `<div class="prompt-btns"></div>`;
-    const box = pr.querySelector(".prompt-btns");
-    for (const m of pendingMoves.slice(0, 60)) {
-      if (isDiscard && m.type === "discard_play") {
-        const card = G.discard_open[m.index];
-        const d = document.createElement("div");
-        d.className = "discard-pick";
-        d.innerHTML = `<img src="/static/art/cards/${card.id}.jpg">`;
-        d.title = m.label;
-        d.addEventListener("click", () => doMove(m));
-        box.appendChild(d);
-      } else {
-        const b = document.createElement("button");
-        b.className = "btn small";
-        b.innerHTML = coinify(m.label);
-        b.addEventListener("click", () => doMove(m));
-        box.appendChild(b);
-      }
-    }
-  } else if (G.pending && G.pending.type === "shire_play" && canAct()) {
-    pr.style.display = "";
-    pr.innerHTML = `<div class="prompt-title">Шир: выбери видимую карту в раскладке (или пропусти)</div>`;
+  const isDiscard = G.pending && G.pending.type === "play_from_discard";
+  const canSkip = all.some((m) => m.type === "skip");
+  const btnMoves = all.filter((m) => !MAP_TYPES.includes(m.type) && m.type !== "skip");
+  const mapMoves = all.filter((m) => MAP_TYPES.includes(m.type));
+
+  const skipBtn = () => {
     const b = document.createElement("button");
-    b.className = "btn small";
+    b.className = "btn small ghost";
     b.textContent = "Пропустить";
     b.addEventListener("click", () => doMove({ type: "skip", label: "Пропустить" }));
-    pr.appendChild(b);
+    return b;
+  };
+
+  if (isDiscard) {
+    pr.style.display = "";
+    pr.innerHTML =
+      `<div class="prompt-title">Сыграй бесплатно любую проданную карту:</div>` +
+      `<div class="prompt-btns"></div>`;
+    const box = pr.querySelector(".prompt-btns");
+    for (const m of all.filter((m) => m.type === "discard_play")) {
+      const card = G.discard_open[m.index];
+      const d = document.createElement("div");
+      d.className = "discard-pick";
+      d.innerHTML = `<img src="/static/art/cards/${card.id}.jpg">`;
+      d.title = m.label;
+      d.addEventListener("click", () => doMove(m));
+      box.appendChild(d);
+    }
+    if (canSkip) box.appendChild(skipBtn());
+  } else if (G.pending && G.pending.type === "shire_play" && canAct()) {
+    pr.style.display = "";
+    pr.innerHTML = `<div class="prompt-title">Шир: выбери видимую карту в раскладке</div>`;
+    pr.appendChild(skipBtn());
+  } else if (btnMoves.length) {
+    // не-картовые выборы (доп. ход, жетоны, расы) — кнопками
+    pr.style.display = "";
+    const why = G.pending && G.pending.why ? ` (${G.pending.why})` : "";
+    pr.innerHTML = `<div class="prompt-title">Выбор${why}:</div><div class="prompt-btns"></div>`;
+    const box = pr.querySelector(".prompt-btns");
+    for (const m of btnMoves.slice(0, 60)) {
+      const b = document.createElement("button");
+      b.className = "btn small";
+      b.innerHTML = coinify(m.label);
+      b.addEventListener("click", () => doMove(m));
+      box.appendChild(b);
+    }
+    if (canSkip) box.appendChild(skipBtn());
+  } else if (mapMoves.length) {
+    // действие по карте — регионы сами подсвечиваются; текст-подсказку НЕ показываем,
+    // только кнопку «Пропустить» (если действие опционально) + автоскролл к карте
+    const key = mapMoves.map((m) => m.type + (m.region || m.to || "")).join();
+    if (canSkip) {
+      pr.style.display = "";
+      pr.innerHTML = `<div class="prompt-btns"></div>`;
+      pr.querySelector(".prompt-btns").appendChild(skipBtn());
+    } else {
+      pr.style.display = "none";
+      pr.innerHTML = "";
+    }
+    if (key !== _mapPendingKey && window.innerWidth <= 820) {
+      document.querySelector(".board").scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    _mapPendingKey = key;
   } else {
     pr.style.display = "none";
     pr.innerHTML = "";
+    _mapPendingKey = null;
   }
 }
 
@@ -693,6 +877,99 @@ function renderLog() {
   $("#game-log").innerHTML = coinify(G.log.map((l) => `<div>${l}</div>`).join(""));
   const el = $("#game-log");
   el.scrollTop = el.scrollHeight;
+}
+
+/* ---------- мобильный статус-бар + док своих карт ---------- */
+
+function mySeat() {
+  if (ROOM && ROOM.mode !== "hotseat") return ROOM.seat;
+  return actorSeat() ?? 0;
+}
+
+function renderMobile() {
+  const seat = mySeat();
+  const pl = G.players[seat];
+  const opp = G.players[1 - seat];
+  const ended = G.winner !== null && G.winner !== undefined;
+
+  const mt = $("#m-turn");
+  if (ended) {
+    mt.textContent =
+      G.winner === seat ? "🏆 Победа!" : G.winner === "draw" ? "🤝 Ничья" : "💀 Поражение";
+    mt.className = "";
+  } else if (G.waiting) {
+    mt.textContent = "⏳ Ждём соперника";
+    mt.className = "";
+  } else if (canAct()) {
+    mt.textContent = "▶ Твой ход";
+    mt.className = "my";
+  } else {
+    mt.textContent = "⏳ Ход соперника…";
+    mt.className = "";
+  }
+  $("#m-opp").innerHTML = ""; // сводка соперника убрана
+
+  // нижний бар: слева мои деньги, справа деньги врага (цвет по фракции)
+  const oppSeat = 1 - seat;
+  $("#dock-coins").innerHTML = coinify(`🪙 ${pl.coins}`);
+  $("#dock-coins").className = "dock-coin " + (seat === 1 ? "s" : "f");
+  $("#dock-opp-coins").innerHTML = coinify(`🪙 ${opp.coins}`);
+  $("#dock-opp-coins").className = "dock-coin " + (oppSeat === 1 ? "s" : "f");
+
+  // слева — мои зелёные карты (расы), справа — накопленные жетоны
+  const greens = pl.played.filter((c) => c.type === "green");
+  $("#dock-races").innerHTML = greens.length
+    ? greens.map((c) => `<img src="/static/art/cards/${c.id}.jpg">`).join("") +
+      `<span class="dock-rc">${pl.race_victory_count}/6</span>`
+    : `<span class="dock-empty">рас ${pl.race_victory_count}/6</span>`;
+  $("#dock-tokens").innerHTML = pl.tokens.length
+    ? pl.tokens
+        .map(
+          (t) =>
+            `<span class="dock-tok"><img src="/static/art/tokens/${t.id}.png" class="${
+              t.kind === "instant" ? "used" : ""
+            }"><span class="tok-tip">${t.text}${
+              t.kind === "instant" ? " <i>(использован)</i>" : ""
+            }</span></span>`
+        )
+        .join("")
+    : "";
+
+  renderHand();
+}
+
+let handWho = "me"; // "me" | "opp" | "sold"
+function renderHand() {
+  if (!G || G.empty) return;
+  let cards, title;
+  if (handWho === "sold") {
+    cards = G.discard_open || [];
+    title = "Проданные / сброшенные";
+  } else {
+    const seat = handWho === "me" ? mySeat() : 1 - mySeat();
+    cards = G.players[seat].played;
+    title = handWho === "me" ? "Мои карты" : `Карты: ${SIDE_RU[1 - mySeat()]}`;
+  }
+  $("#hand-title").textContent = title;
+  $("#hand-me").classList.toggle("on", handWho === "me");
+  $("#hand-opp").classList.toggle("on", handWho === "opp");
+  const byType = {};
+  for (const c of cards) (byType[c.type] = byType[c.type] || []).push(c);
+  $("#hand-full").innerHTML =
+    TYPE_ORDER.filter((t) => byType[t])
+      .map(
+        (t) =>
+          `<div class="stack-col">` +
+          byType[t]
+            .map(
+              (c) =>
+                `<div class="stk"><img draggable="false" src="/static/art/cards/${c.id}.jpg">
+                 <div class="card-pop">${cardTooltip(c)}</div></div>`
+            )
+            .join("") +
+          `</div>`
+      )
+      .join("") || "<p class='small'>карт пока нет</p>";
 }
 
 /* ---------- main render / actions ---------- */
@@ -709,6 +986,7 @@ function renderAll() {
   renderTableau();
   renderLog();
   renderWinGlow();
+  renderMobile();
 }
 
 /* ---------- rooms: bot / pvp / hotseat ---------- */
@@ -901,9 +1179,30 @@ function toast(msg) {
   t._h = setTimeout(() => t.classList.add("hidden"), 3500);
 }
 
-$("#to-lobby").addEventListener("click", () => {
+function leaveToLobby() {
   if (!G || G.winner !== null) { location.href = "/"; return; }
   $("#confirm-modal").classList.remove("hidden");
+}
+$("#to-lobby").addEventListener("click", leaveToLobby);
+$("#m-lobby").addEventListener("click", leaveToLobby);
+function openHand(who) {
+  handWho = who;
+  renderHand();
+  $("#hand-overlay").classList.remove("hidden");
+}
+$("#dock-all").addEventListener("click", () => openHand("me"));
+$("#dock-opp").addEventListener("click", () => openHand("opp"));
+$("#dock-sold").addEventListener("click", () => openHand("sold"));
+$("#hand-me").addEventListener("click", () => openHand("me"));
+$("#hand-opp").addEventListener("click", () => openHand("opp"));
+$("#hand-close").addEventListener("click", () => $("#hand-overlay").classList.add("hidden"));
+$("#hand-overlay").addEventListener("click", (ev) => {
+  if (ev.target.id === "hand-overlay") $("#hand-overlay").classList.add("hidden");
+});
+let _raf;
+window.addEventListener("resize", () => {
+  clearTimeout(_raf);
+  _raf = setTimeout(() => { if (G && !G.empty) renderAll(); }, 150);
 });
 $("#confirm-yes").addEventListener("click", () => (location.href = "/"));
 $("#confirm-no").addEventListener("click", () =>

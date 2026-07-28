@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Дуэль за Средиземье — прототип</title>
-<link rel="stylesheet" href="/static/style.css?v=29">
+<link rel="stylesheet" href="/static/style.css?v=41">
 </head>
 <body>
 
@@ -87,6 +87,45 @@
 </div>
 <div id="toast" class="hidden"></div>
 
+<!-- мобильный оверлей «все мои карты» -->
+<div class="modal hidden" id="hand-overlay">
+  <div class="modal-card hand-card">
+    <h2 id="hand-title">Мои карты</h2>
+    <div class="hand-toggle">
+      <button class="btn small on" id="hand-me">🃏 Мои</button>
+      <button class="btn small" id="hand-opp">🛡 Противника</button>
+    </div>
+    <div id="hand-full"></div>
+    <div class="lobby-btns"><button class="btn" id="hand-close">Закрыть</button></div>
+  </div>
+</div>
+
+<!-- мобильный статус-бар (сверху) -->
+<div id="m-top">
+  <button class="btn small" id="m-lobby">←</button>
+  <span id="m-turn">—</span>
+  <span id="m-opp"></span>
+</div>
+
+<!-- мобильный нижний бар: слева зелёные карты, справа жетоны; ниже деньги/кнопки -->
+<div id="m-dock">
+  <div class="dock-top">
+    <div class="dock-races" id="dock-races"></div>
+    <div class="dock-tokens" id="dock-tokens"></div>
+  </div>
+  <div class="dock-bar">
+    <div class="dock-side">
+      <span class="dock-coin f" id="dock-coins">🪙 —</span>
+      <button class="btn small" id="dock-all">🃏 мои</button>
+    </div>
+    <button class="btn small" id="dock-sold">🗑 сброс</button>
+    <div class="dock-side">
+      <button class="btn small" id="dock-opp">🛡 враг</button>
+      <span class="dock-coin s" id="dock-opp-coins">🪙 —</span>
+    </div>
+  </div>
+</div>
+
 <div class="table">
 
   <aside class="player-area fellowship" id="panel-0">
@@ -127,6 +166,7 @@
     </section>
 
     <section class="quest">
+      <div class="quest-vp" id="quest-vp"></div>
       <div class="quest-track" id="quest-track"></div>
     </section>
 
@@ -141,6 +181,6 @@
   </aside>
 
 </div>
-<script src="/static/app.js?v=26"></script>
+<script src="/static/app.js?v=37"></script>
 </body>
 </html>
