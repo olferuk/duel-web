@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Дуэль за Средиземье — прототип</title>
-<link rel="stylesheet" href="/static/style.css?v=41">
+<link rel="stylesheet" href="/static/style.css?v=45">
 </head>
 <body>
 
@@ -27,13 +27,13 @@
     </div>
 
     <div class="lobby-section hidden" id="lobby-bot-opts">
-      <label>Соперник:
-        <select id="bot-diff"></select>
-      </label>
+      <div class="bot-pick-title">Выбери соперника:</div>
+      <div class="bot-pick" id="bot-pick"></div>
       <div class="bot-desc" id="bot-desc"></div>
       <label>Я играю за:
         <select id="side-select">
-          <option value="0" selected>Братство Кольца</option>
+          <option value="random" selected>🎲 Случайно</option>
+          <option value="0">Братство Кольца</option>
           <option value="1">Саурона</option>
         </select>
       </label>
@@ -48,7 +48,8 @@
     <div class="lobby-section hidden" id="lobby-pvp-opts">
       <label>Я играю за:
         <select id="pvp-side-select">
-          <option value="0" selected>Братство Кольца</option>
+          <option value="random" selected>🎲 Случайно</option>
+          <option value="0">Братство Кольца</option>
           <option value="1">Саурона</option>
         </select>
       </label>
@@ -181,6 +182,6 @@
   </aside>
 
 </div>
-<script src="/static/app.js?v=37"></script>
+<script src="/static/app.js?v=39"></script>
 </body>
 </html>

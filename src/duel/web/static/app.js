@@ -1059,24 +1059,31 @@ function hideLobby() {
   $("#lobby").classList.add("hidden");
 }
 
+let pickedBot = null;
+function chosenSide(id) {
+  const v = $(id).value;
+  return v === "random" ? Math.floor(Math.random() * 2) : Number(v);
+}
 async function loadBotMenu() {
   try {
     const resp = await api("/api/bots");
-    const sel = $("#bot-diff");
-    sel.innerHTML = "";
+    const box = $("#bot-pick");
+    box.innerHTML = "";
     for (const m of resp.menu || []) {
-      const o = document.createElement("option");
-      o.value = m.id;
-      o.textContent = m.label;
-      o.dataset.desc = m.desc || "";
-      sel.appendChild(o);
+      const btn = document.createElement("button");
+      btn.className = "btn bot-opt";
+      btn.dataset.id = m.id;
+      btn.dataset.desc = m.desc || "";
+      btn.innerHTML = m.label; // в label уже есть эмодзи (👑, и т.п.)
+      btn.addEventListener("click", () => {
+        pickedBot = m.id;
+        box.querySelectorAll(".bot-opt").forEach((b) => b.classList.toggle("on", b === btn));
+        $("#bot-desc").textContent = m.desc || "";
+      });
+      box.appendChild(btn);
     }
-    const updDesc = () => {
-      const o = sel.selectedOptions[0];
-      $("#bot-desc").textContent = o ? o.dataset.desc : "";
-    };
-    sel.addEventListener("change", updDesc);
-    updDesc();
+    const first = box.querySelector(".bot-opt");
+    if (first) first.click(); // выбрать первого (чемпионку) по умолчанию
   } catch (e) {
     /* ai package unavailable */
   }
@@ -1119,21 +1126,21 @@ document.querySelectorAll("[data-back]").forEach((b) =>
 );
 
 $("#start-bot").addEventListener("click", async () => {
-  const sel = $("#bot-diff");
+  const picked = $(`#bot-pick .bot-opt.on`);
   let resp;
   try {
     resp = await post("/api/room/new", {
-    mode: "bot",
-    bot: sel.value || "mcts",
-    side: Number($("#side-select").value),
-    promo: $("#promo").checked,
-  });
+      mode: "bot",
+      bot: pickedBot || "mcts",
+      side: chosenSide("#side-select"),
+      promo: $("#promo").checked,
+    });
   } catch (e) {
     toast("Не удалось создать партию: " + e.message);
     return;
   }
   setRoom(resp);
-  ROOM.botLabel = sel.selectedOptions[0] ? sel.selectedOptions[0].textContent : sel.value;
+  ROOM.botLabel = picked ? picked.textContent : pickedBot;
   $("#room-info").textContent = `против бота: ${ROOM.botLabel}`;
   hideLobby();
   await botIfNeeded(); // if the bot's side opens the game
@@ -1148,7 +1155,7 @@ $("#lobby-hotseat").addEventListener("click", async () => {
 $("#start-pvp").addEventListener("click", async () => {
   const resp = await post("/api/room/new", {
     mode: "pvp",
-    side: Number($("#pvp-side-select").value),
+    side: chosenSide("#pvp-side-select"),
     promo: $("#pvp-promo").checked,
   });
   setRoom(resp);
