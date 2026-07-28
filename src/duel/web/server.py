@@ -118,8 +118,8 @@ def get_game() -> dict:
 BOT_MENU = [
     {
         "id": "galadriel",
-        "label": "👑 Галадриэль · ELO ≈1470 · ЧЕМПИОНКА",
-        "desc": "Владычица Лориэна и действующая чемпионка: сила через союзы шести рас (MCTS-240)",
+        "label": "👑 Галадриэль · ELO ≈1530 · ЧЕМПИОНКА",
+        "desc": "Владычица Лориэна, третье воплощение династии: сила через союзы шести рас (MCTS-240)",
     },
     {
         "id": "champion",
@@ -248,7 +248,7 @@ def _make_bot(kind: str, seed: int = 7):
         return HonestMctsBot(sims=150, seed=seed, name="mcts150-heur", leaf="heuristic", worlds=4)
     if kind == "galadriel":
         try:
-            ev = _net_eval("p_galadriel")
+            ev = _net_eval("gala_best")  # актуальная чемпионка династии (Γ³)
         except Exception:
             from duel.ai.personality import personality_eval
 
