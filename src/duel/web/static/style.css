@@ -458,13 +458,17 @@ img.coin {
   position: fixed; inset: 0; z-index: 200;
   background: #170f08;
   display: flex; align-items: center; justify-content: center;
+  overflow-y: auto;                 /* контент выше экрана — можно доскроллить */
+  padding: 16px 0;
+  -webkit-overflow-scrolling: touch;
 }
 .lobby.hidden { display: none; }
 .hidden { display: none !important; }
 .lobby-card {
   background: #2e2416; border: 2px solid #6a5230; border-radius: 14px;
-  padding: 34px 44px; max-width: 560px; width: 92%;
+  padding: 24px 28px; max-width: 560px; width: 92%;
   box-shadow: 0 12px 60px rgba(0,0,0,0.6); text-align: center;
+  margin: auto;                     /* центр по вертикали, но растёт и скроллится */
 }
 .lobby-card h1 { color: #d4a017; margin: 0 0 6px; font-size: 30px; }
 .lobby-sub { color: #b8a888; margin: 0 0 22px; font-size: 15px; }
