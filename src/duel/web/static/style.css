@@ -866,7 +866,9 @@ body.cb { --band: 0.265; }
   .turnbar { display: none; }             /* статус в #m-top */
   .prompt { display: none; }              /* показываем ниже, если нужно */
   .gamelog { display: none; }
-  .center { display: flex; flex-direction: column; gap: 6px; padding: 46px 5px 108px; }
+  /* низ: высота дока (~120px) + воздух, чтобы трек Кольца целиком поднимался над доком */
+  .center { display: flex; flex-direction: column; gap: 6px;
+    padding: 46px 5px calc(170px + env(safe-area-inset-bottom, 0px)); }
 
   /* порядок: сначала раскладка (главное), потом ряд рас/ориентиров, потом карта */
   .center .mid-row { order: 1; flex-direction: column; }
@@ -874,7 +876,9 @@ body.cb { --band: 0.265; }
   .center .quest { order: 3; }
   .center .prompt { order: 0; display: block; position: sticky; top: 40px; z-index: 90; }
 
-  .mid-row .tableau-wrap { flex: 0 0 auto; width: 100%; min-width: 0; overflow-x: auto; }
+  /* раскладка масштабируется под экран (JS zoom) → скроллить нечего */
+  .mid-row .tableau-wrap { flex: 0 0 auto; width: 100%; min-width: 0; overflow-x: hidden; }
+  .mid-row .tableau { min-height: 0; }
   .mid-row { min-width: 0; }
   .mid-row .board { flex: 0 0 auto; min-width: 0; width: 100%; max-width: 100%; padding: 4px; box-sizing: border-box; }
   .mid-row .board .map-art { width: 100%; max-width: 100%; min-width: 0; }
@@ -895,7 +899,9 @@ body.cb { --band: 0.265; }
   .race-token-art:hover .race-pop, .tile:hover .lm-pop,
   .card.faceup:hover .card-pop, .stk:hover .card-pop,
   .hand-thumb:hover .card-pop, .tok-wrap:hover .tok-pop { display: none !important; }
-  .tile.art { width: 128px; }
+  /* ориентиры — тянутся по ширине экрана, чтобы влезал весь ряд без обрезки */
+  .landmark-row { gap: 6px; max-width: 100%; }
+  .tile.art { width: auto; flex: 1 1 0; min-width: 0; max-width: 132px; }
 
   /* фиксированный статус-бар сверху */
   #m-top {
@@ -985,6 +991,15 @@ body.cb { --band: 0.265; }
   .dock-empty { color: #b8a888; font-size: 12px; }
   .dock-bar { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
   #dock-sold { flex-shrink: 0; }
+}
+
+/* узкие экраны (≤360px): нижний бар ужимается, иначе правая монета уезжает за край */
+@media (max-width: 360px) {
+  .dock-bar { gap: 3px; }
+  .dock-side { gap: 4px; }
+  #m-dock { padding: 7px 5px; }
+  #dock-all, #dock-opp, #dock-sold { font-size: 13px; padding: 4px 7px; }
+  .dock-coin { font-size: 15px; padding: 3px 7px; }
 }
 
 /* выбор соперника — кнопки вместо комбобокса (мобайл-френдли) */

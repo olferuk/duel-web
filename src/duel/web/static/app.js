@@ -380,9 +380,12 @@ function renderTableau() {
 
   const xs = state.slots.map((s) => s.x);
   const minX = Math.min(...xs), maxX = Math.max(...xs);
-  const width = (maxX - minX) * UNIT_X + CARD_W + 40;
-  const height = Math.max(...state.slots.map((s) => s.row)) * STEP_Y + CARD_H + 30;
   const isMobile = window.innerWidth <= 820;
+  // на телефоне карты кладём вплотную и режем поля — каждый пиксель идёт в масштаб
+  const unitX = isMobile ? CARD_W / 2 : UNIT_X;
+  const padX = isMobile ? 10 : 40;
+  const width = (maxX - minX) * unitX + CARD_W + padX;
+  const height = Math.max(...state.slots.map((s) => s.row)) * STEP_Y + CARD_H + 30;
   const cx = isMobile ? width / 2 : Math.max(el.clientWidth, width) / 2;
 
   el.innerHTML = coinify(state.slots
@@ -400,7 +403,7 @@ function renderTableau() {
       const content = s.revealed
         ? cardFace(s.card, s.price)
         : `<span class="slot-id" style="color:#c9b280">${s.id}</span>`;
-      const left = cx + s.x * UNIT_X - CARD_W / 2;
+      const left = cx + s.x * unitX - CARD_W / 2;
       const top = 15 + s.row * STEP_Y;
       return `<div class="${cls}" data-slot="${s.id}" style="left:${left}px;top:${top}px">${content}</div>`;
     })
@@ -413,11 +416,11 @@ function renderTableau() {
     })
   );
 
-  // мобильный масштаб: крупные карты + горизонтальный свайп, если шире экрана.
-  // zoom (в отличие от transform) меняет и layout-бокс → работает нативный скролл.
+  // мобильный масштаб: раскладка ВСЕГДА влезает по ширине — никакого горизонтального скролла.
+  // zoom (в отличие от transform) меняет и layout-бокс → высота блока тоже ужимается.
   if (isMobile) {
-    const avail = el.parentElement.clientWidth - 4;
-    const fit = Math.min(1, Math.max(avail / width, 0.6)); // не мельче 60%
+    const avail = el.parentElement.clientWidth - 2;
+    const fit = Math.min(1, avail / width);
     el.style.width = width + "px";
     el.style.zoom = fit;
     el.style.minHeight = height + "px";
