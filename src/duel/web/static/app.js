@@ -946,19 +946,34 @@ function colorSides(text) {
     .replace(/Саурон(?:ом|а|у|е)?/g, (m) => `<b class="s">${m}</b>`);
 }
 
-let _logHtml = null;
-function renderLog() {
-  const html = coinify(G.log.map((l) => `<div>${colorSides(l)}</div>`).join(""));
-  if (html === _logHtml) return; // ничего не изменилось — не трогаем скролл читателя
-  _logHtml = html;
-  for (const id of ["#game-log", "#log-full"]) {
-    const el = $(id);
-    if (!el) continue;
-    // если читатель отлистал вверх — не дёргаем его вниз при каждом обновлении
-    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
-    el.innerHTML = html;
-    if (atBottom) el.scrollTop = el.scrollHeight;
+// в состоянии приходит только хвост журнала (он опрашивается раз в секунду);
+// полную историю подтягиваем отдельным запросом при открытии оверлея и дописываем хвостом
+let _fullLog = null;
+const _logHtml = {};
+
+function mergeTail(full, tail) {
+  for (let k = Math.min(full.length, tail.length); k > 0; k--) {
+    if (full.slice(-k).every((l, i) => l === tail[i])) return full.concat(tail.slice(k));
   }
+  return full.concat(tail);
+}
+
+function paintLog(sel, lines) {
+  const el = $(sel);
+  if (!el) return;
+  const html = coinify(lines.map((l) => `<div>${colorSides(l)}</div>`).join(""));
+  if (html === _logHtml[sel]) return; // ничего не изменилось — не трогаем скролл читателя
+  _logHtml[sel] = html;
+  // если читатель отлистал вверх — не дёргаем его вниз при каждом обновлении
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
+  el.innerHTML = html;
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function renderLog() {
+  if (_fullLog) _fullLog = mergeTail(_fullLog, G.log);
+  paintLog("#game-log", G.log);
+  paintLog("#log-full", _fullLog || G.log);
 }
 
 /* ---------- мобильный статус-бар + док своих карт ---------- */
@@ -1115,6 +1130,7 @@ function renderAll() {
 function setRoom(resp) {
   ROOM = { id: resp.room, token: resp.token || (ROOM && ROOM.token), seat: resp.seat ?? (ROOM && ROOM.seat), mode: resp.mode };
   G = resp;
+  _fullLog = null; // новая партия — историю подтянем заново
   const info = $("#room-info");
   if (resp.mode === "pvp") {
     const link = `${location.origin}/?room=${resp.room}`;
@@ -1356,15 +1372,28 @@ function openHand(who) {
   renderHand();
   $("#hand-overlay").classList.remove("hidden");
 }
-$("#m-log").addEventListener("click", () => {
-  if (!G || G.empty) return;
-  renderLog();
-  const ov = $("#log-overlay");
-  ov.classList.remove("hidden");
+function logToBottom() {
   // свежие события внизу: на телефоне листается сам оверлей, на десктопе — блок лога
-  const el = $("#log-full");
+  const ov = $("#log-overlay"), el = $("#log-full");
   el.scrollTop = el.scrollHeight;
   ov.scrollTop = ov.scrollHeight;
+}
+
+$("#m-log").addEventListener("click", async () => {
+  if (!G || G.empty) return;
+  renderLog();
+  $("#log-overlay").classList.remove("hidden");
+  logToBottom();
+  if (!ROOM) return;
+  try {
+    // вся история, а не последние 14 строк из состояния
+    const r = await api(`/api/room/${ROOM.id}/log?token=${encodeURIComponent(ROOM.token)}`);
+    _fullLog = r.log;
+    renderLog();
+    logToBottom();
+  } catch (e) {
+    /* сеть подвела — остаётся хвост из состояния */
+  }
 });
 $("#log-close").addEventListener("click", () => $("#log-overlay").classList.add("hidden"));
 

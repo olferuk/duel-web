@@ -453,6 +453,14 @@ def room_state(rid: str, token: str, v: int = -1) -> dict:
     return _payload(rid, room, seat)
 
 
+@app.get("/api/room/{rid}/log")
+def room_log(rid: str, token: str) -> dict:
+    """Полный журнал партии: в state гоняется только хвост (он опрашивается раз в секунду)."""
+    room = _room(rid)
+    _seat_of(room, token)
+    return {"log": room["game"].log}
+
+
 @app.post("/api/room/{rid}/move")
 def room_move(rid: str, body: RoomMove) -> dict:
     room = _room(rid)
