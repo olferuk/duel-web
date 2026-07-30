@@ -622,8 +622,20 @@ img.coin {
   0%,100% { filter: drop-shadow(0 0 2px rgba(200,70,70,0.3)); }
   50% { filter: drop-shadow(0 0 8px #ff9c9c) drop-shadow(0 0 18px rgba(200,70,70,0.9)); }
 }
+/* ---- ход бота: коротко мигаем тем, что он забрал (карта в раскладке / тайл) ---- */
+.bot-flash {
+  outline: 3px solid #ffe08a; outline-offset: 2px; border-radius: 8px;
+  animation: botFlash 0.32s steps(1, end) 2;
+  z-index: 60;
+}
+@keyframes botFlash {
+  0% { filter: brightness(1.9) saturate(1.35); box-shadow: 0 0 26px 9px rgba(255,224,138,0.95); }
+  50% { filter: none; box-shadow: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .vp-glow, .vp-flash, .vp-flash-art, .result-badge.win { animation: none; }
+  .bot-flash { animation: none; box-shadow: 0 0 26px 9px rgba(255,224,138,0.9); }
   .vp-flash { box-shadow: 0 0 18px 5px rgba(212,160,23,0.7); }
   .vp-flash.vp-lose { box-shadow: 0 0 18px 5px rgba(200,70,70,0.7); }
 }
@@ -888,6 +900,19 @@ body.cb { --band: 0.265; }
   box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
 .hand-card #hand-full { columns: 3 92px; column-gap: 8px; }
 .hand-card .stack-col { break-inside: avoid; margin: 0 auto 8px; }
+/* оверлей истории партии (кнопка 📜 в мобильной шапке) */
+.log-card { max-width: 560px; }
+.log-card #log-full {
+  max-height: 62vh; overflow-y: auto; text-align: left;
+  background: rgba(0,0,0,0.25); border: 1px solid #4a3820; border-radius: 8px;
+  padding: 8px 10px; font-size: 14px; line-height: 1.45;
+}
+.log-card #log-full div { padding: 2px 0; border-bottom: 1px solid rgba(106,82,48,0.25); }
+.log-card #log-full div:last-child { border-bottom: 0; }
+/* стороны в логе — фамильными цветами */
+.quest-log b.f, .log-card b.f { color: #9fc3ea; font-weight: bold; }
+.quest-log b.s, .log-card b.s { color: #ea9f9f; font-weight: bold; }
+
 .hand-toggle { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
 .hand-toggle .btn.on { outline: 2px solid #d4a017; }
 
@@ -967,6 +992,7 @@ body.cb { --band: 0.265; }
   #m-turn.my { color: #7ec97e; }
   /* жетоны содружества соперника — единственное место, где их видно с телефона */
   #m-opp { margin-left: auto; flex-shrink: 0; }
+  #m-log { flex-shrink: 0; padding: 3px 8px; }
   .opp-toks { display: flex; align-items: center; gap: 3px; font-size: 13px;
     padding: 2px 6px; border-radius: 12px; }
   .opp-toks.s { background: rgba(140,44,44,0.35); border: 1px solid #8c4a4a; }
@@ -1055,6 +1081,9 @@ body.cb { --band: 0.265; }
 
 /* узкие экраны (≤360px): нижний бар ужимается, иначе правая монета уезжает за край */
 @media (max-width: 360px) {
+  #m-top { gap: 5px; padding: 0 5px; }
+  #m-turn { font-size: 14px; }
+  .opp-toks img { height: 22px; }
   .dock-bar { gap: 3px; }
   .dock-side { gap: 4px; }
   #m-dock { padding: 7px 5px; }

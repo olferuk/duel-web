@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Дуэль за Средиземье — прототип</title>
-<link rel="stylesheet" href="/static/style.css?v=49">
+<link rel="stylesheet" href="/static/style.css?v=50">
 </head>
 <body>
 
@@ -102,11 +102,21 @@
   </div>
 </div>
 
+<!-- история партии (мобайл: кнопка 📜 в шапке) -->
+<div class="modal hidden" id="log-overlay">
+  <div class="modal-card log-card">
+    <h2>📜 История партии</h2>
+    <div class="quest-log" id="log-full"></div>
+    <div class="lobby-btns"><button class="btn" id="log-close">Закрыть</button></div>
+  </div>
+</div>
+
 <!-- мобильный статус-бар (сверху) -->
 <div id="m-top">
   <button class="btn small" id="m-lobby">←</button>
   <span id="m-turn">—</span>
   <span id="m-opp"></span>
+  <button class="btn small" id="m-log" title="История партии">📜</button>
 </div>
 
 <!-- мобильный нижний бар: слева зелёные карты, справа жетоны; ниже деньги/кнопки -->
@@ -183,6 +193,6 @@
   </aside>
 
 </div>
-<script src="/static/app.js?v=43"></script>
+<script src="/static/app.js?v=44"></script>
 </body>
 </html>

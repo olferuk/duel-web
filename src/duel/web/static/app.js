@@ -938,10 +938,21 @@ function renderPrompt() {
   }
 }
 
+// в логе красим стороны фамильными цветами: Братство — синий, Саурон — тёмно-красный
+function colorSides(text) {
+  return text
+    .replace(/Братств(?:о|а|у|ом|е)(\sКольца)?/g, (m) => `<b class="f">${m}</b>`)
+    .replace(/Саурон(?:ом|а|у|е)?/g, (m) => `<b class="s">${m}</b>`);
+}
+
 function renderLog() {
-  $("#game-log").innerHTML = coinify(G.log.map((l) => `<div>${l}</div>`).join(""));
-  const el = $("#game-log");
-  el.scrollTop = el.scrollHeight;
+  const html = coinify(G.log.map((l) => `<div>${colorSides(l)}</div>`).join(""));
+  for (const id of ["#game-log", "#log-full"]) {
+    const el = $(id);
+    if (!el) continue;
+    el.innerHTML = html;
+    el.scrollTop = el.scrollHeight;
+  }
 }
 
 /* ---------- мобильный статус-бар + док своих карт ---------- */
@@ -978,13 +989,13 @@ function renderMobile() {
   $("#m-opp").innerHTML = oppToks.length
     ? `<span class="opp-toks ${seat === 1 ? "f" : "s"}" id="opp-toks" title="жетоны содружества соперника">🛡` +
       oppToks
-        .slice(0, 4)
+        .slice(0, 3)
         .map(
           (t) =>
             `<img src="/static/art/tokens/${t.id}.png" class="${t.kind === "instant" ? "used" : ""}">`
         )
         .join("") +
-      (oppToks.length > 4 ? `<b>+${oppToks.length - 4}</b>` : "") +
+      (oppToks.length > 3 ? `<b>+${oppToks.length - 3}</b>` : "") +
       `</span>`
     : "";
 
@@ -1123,6 +1134,33 @@ async function roomState() {
   }
 }
 
+// бот ходит мгновенно — мигаем тем, что он забрал, ПОКА оно ещё на экране
+function visibleSnapshot(state) {
+  return {
+    slots: new Set(
+      (state && state.tableau ? state.tableau.slots : [])
+        .filter((s) => s.card)
+        .map((s) => String(s.id))
+    ),
+    tiles: new Set((state && state.landmarks ? state.landmarks : []).map((lm) => lm.id)),
+  };
+}
+
+async function flashBotMove(before, next) {
+  const now = visibleSnapshot(next);
+  const goneSlot = [...before.slots].find((id) => !now.slots.has(id));
+  const goneTile = [...before.tiles].find((id) => !now.tiles.has(id));
+  const el = goneSlot
+    ? document.querySelector(`#tableau .card[data-slot="${goneSlot}"]`)
+    : goneTile
+      ? document.querySelector(`.tile.art[data-tile="${goneTile}"]`)
+      : null;
+  if (!el) return;
+  el.classList.add("bot-flash");
+  await new Promise((r) => setTimeout(r, 640)); // две вспышки по ~180 мс + пауза
+  el.classList.remove("bot-flash");
+}
+
 let botBusy = false;
 async function botIfNeeded() {
   if (!ROOM || ROOM.mode !== "bot" || botBusy) return;
@@ -1131,7 +1169,10 @@ async function botIfNeeded() {
     let guard = 0;
     while (G && G.winner === null && actorSeat() === G.bot_seat && guard++ < 80) {
       $("#turnbar").innerHTML += ' <span class="thinking">🤔 бот думает…</span>';
-      G = await post(`/api/room/${ROOM.id}/bot_step`, { token: ROOM.token });
+      const before = visibleSnapshot(G);
+      const next = await post(`/api/room/${ROOM.id}/bot_step`, { token: ROOM.token });
+      await flashBotMove(before, next); // сначала показать, ЧТО он взял, потом перерисовать
+      G = next;
       renderAll();
       await new Promise((r) => setTimeout(r, 250));
     }
@@ -1301,6 +1342,17 @@ function openHand(who) {
   renderHand();
   $("#hand-overlay").classList.remove("hidden");
 }
+$("#m-log").addEventListener("click", () => {
+  if (!G || G.empty) return;
+  renderLog();
+  $("#log-overlay").classList.remove("hidden");
+  const el = $("#log-full");
+  el.scrollTop = el.scrollHeight; // свежие события — внизу, как в веб-версии
+});
+$("#log-close").addEventListener("click", () => $("#log-overlay").classList.add("hidden"));
+$("#log-overlay").addEventListener("click", (ev) => {
+  if (ev.target.id === "log-overlay") $("#log-overlay").classList.add("hidden");
+});
 $("#m-opp").addEventListener("click", (ev) => {
   if (ev.target.closest(".opp-toks")) { ev.stopPropagation(); openHand("opp"); }
 });
