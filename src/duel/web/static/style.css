@@ -1023,6 +1023,26 @@ body.cb { --band: 0.265; }
 
   /* оверлей «все карты» */
   .hand-thumb img { width: 72px; }
+
+  /* На телефоне НЕ используем внутренний скролл-бокс: листается весь оверлей —
+     это тот же скролл, что и у страницы, и он работает в любом мобильном браузере. */
+  .modal {
+    align-items: flex-start; justify-content: center;
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain; padding: 8px;
+  }
+  .modal-card { margin: auto 0; max-height: none; width: 100%; }
+  .log-card { display: block; max-height: none; }
+  .log-card #log-full { max-height: none; overflow: visible; flex: none; }
+  /* заголовок и «Закрыть» остаются на виду, как бы далеко ни отлистали */
+  .log-card h2, .hand-card h2 {
+    position: sticky; top: -8px; z-index: 2;
+    background: #2e2416; padding: 6px 0; margin: 0 0 8px;
+  }
+  .log-card .lobby-btns, .hand-card .lobby-btns {
+    position: sticky; bottom: -8px; z-index: 2;
+    background: #2e2416; padding: 8px 0 4px; margin-top: 8px;
+  }
 }
 
 /* ---- аккуратный tap-попап (мобильные тултипы рас/ландмарков) ---- */

@@ -1359,14 +1359,27 @@ function openHand(who) {
 $("#m-log").addEventListener("click", () => {
   if (!G || G.empty) return;
   renderLog();
-  $("#log-overlay").classList.remove("hidden");
+  const ov = $("#log-overlay");
+  ov.classList.remove("hidden");
+  // свежие события внизу: на телефоне листается сам оверлей, на десктопе — блок лога
   const el = $("#log-full");
-  el.scrollTop = el.scrollHeight; // свежие события — внизу, как в веб-версии
+  el.scrollTop = el.scrollHeight;
+  ov.scrollTop = ov.scrollHeight;
 });
 $("#log-close").addEventListener("click", () => $("#log-overlay").classList.add("hidden"));
-$("#log-overlay").addEventListener("click", (ev) => {
-  if (ev.target.id === "log-overlay") $("#log-overlay").classList.add("hidden");
-});
+
+// оверлей теперь листается целиком — свайп не должен считаться тапом по фону
+function closeOnBackdrop(id) {
+  const ov = $(id);
+  let dragged = false;
+  ov.addEventListener("touchstart", () => (dragged = false), { passive: true });
+  ov.addEventListener("touchmove", () => (dragged = true), { passive: true });
+  ov.addEventListener("click", (ev) => {
+    if (dragged) { dragged = false; return; }
+    if (ev.target === ov) ov.classList.add("hidden");
+  });
+}
+closeOnBackdrop("#log-overlay");
 $("#m-opp").addEventListener("click", (ev) => {
   if (ev.target.closest(".opp-toks")) { ev.stopPropagation(); openHand("opp"); }
 });
@@ -1376,9 +1389,7 @@ $("#dock-sold").addEventListener("click", () => openHand("sold"));
 $("#hand-me").addEventListener("click", () => openHand("me"));
 $("#hand-opp").addEventListener("click", () => openHand("opp"));
 $("#hand-close").addEventListener("click", () => $("#hand-overlay").classList.add("hidden"));
-$("#hand-overlay").addEventListener("click", (ev) => {
-  if (ev.target.id === "hand-overlay") $("#hand-overlay").classList.add("hidden");
-});
+closeOnBackdrop("#hand-overlay");
 let _raf;
 window.addEventListener("resize", () => {
   clearTimeout(_raf);
