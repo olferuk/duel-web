@@ -760,7 +760,8 @@ function winGlowTargets(reason, side) {
         art: [side === "f" ? ".ring-art .ring-strip" : ".ring-art .ring-nazgul"],
       };
     case "races":
-      return { box: ".supply-row", chips: [`#race-vps .race-vp.${side}`, "#race-row"], art: [] };
+      // мигает только счётчик «N/6» — сами жетоны не обводим
+      return { box: ".supply-row", chips: [`#race-vps .race-vp.${side}`], art: [] };
     case "conquest":
     case "presence":
       return { box: ".mid-row .board", chips: [`.map-vp.${side}`], art: [] };
