@@ -582,45 +582,46 @@ img.coin {
 .player-area.lost { filter: saturate(0.6) brightness(0.85); }
 @keyframes winPulse { 0%,100% { filter: brightness(1); } 50% { filter: brightness(1.25); } }
 .vp-glow {
-  outline: 3px solid #d4a017; outline-offset: 3px; border-radius: 12px;
-  animation: glowPulse 1.6s ease-in-out infinite;
+  outline: 3px solid #c9a24a; outline-offset: 3px; border-radius: 12px;
+  animation: glowPulse 2s ease-in-out infinite;
 }
 @keyframes glowPulse {
-  0%,100% { outline-color: rgba(212,160,23,0.55); }
-  50% { outline-color: rgba(212,160,23,1); }
+  0%,100% { outline-color: rgba(190,150,60,0.42); }
+  50% { outline-color: rgba(212,170,80,0.85); }
 }
-.vp-glow.vp-lose { outline-color: #c05252; animation-name: glowPulseLose; }
+.vp-glow.vp-lose { outline-color: #a85454; animation-name: glowPulseLose; }
 @keyframes glowPulseLose {
-  0%,100% { outline-color: rgba(200,70,70,0.5); }
-  50% { outline-color: rgba(240,110,110,1); }
+  0%,100% { outline-color: rgba(168,84,84,0.42); }
+  50% { outline-color: rgba(205,120,120,0.85); }
 }
 
 /* ---- финал: мигает КОНКРЕТНЫЙ индикатор, из-за которого партия закончилась ---- */
 /* (плашка присутствия на карте / счётчик рас / шаги по Пути Кольца) */
+/* перелив спокойный и тёплый: не белая вспышка, а мягкое золото свечи */
 .vp-flash {
-  outline: 3px solid #d4a017; outline-offset: 2px; border-radius: 10px;
-  animation: chipFlash 1s ease-in-out infinite;
+  outline: 3px solid #c9a24a; outline-offset: 2px; border-radius: 10px;
+  animation: chipFlash 1.5s ease-in-out infinite;
   position: relative; z-index: 20;
 }
 @keyframes chipFlash {
-  0%,100% { outline-color: rgba(212,160,23,0.45); box-shadow: 0 0 0 0 rgba(212,160,23,0); }
-  50% { outline-color: #ffe08a; box-shadow: 0 0 20px 6px rgba(212,160,23,0.75); }
+  0%,100% { outline-color: rgba(190,150,60,0.4); box-shadow: 0 0 0 0 rgba(190,150,60,0); }
+  50% { outline-color: #e0bd6e; box-shadow: 0 0 14px 3px rgba(196,152,52,0.4); }
 }
-.vp-flash.vp-lose { outline-color: #c05252; animation-name: chipFlashLose; }
+.vp-flash.vp-lose { outline-color: #a85454; animation-name: chipFlashLose; }
 @keyframes chipFlashLose {
-  0%,100% { outline-color: rgba(200,70,70,0.45); box-shadow: 0 0 0 0 rgba(200,70,70,0); }
-  50% { outline-color: #ff9c9c; box-shadow: 0 0 20px 6px rgba(200,70,70,0.7); }
+  0%,100% { outline-color: rgba(168,84,84,0.4); box-shadow: 0 0 0 0 rgba(168,84,84,0); }
+  50% { outline-color: #d08c8c; box-shadow: 0 0 14px 3px rgba(168,84,84,0.38); }
 }
 /* фигурки на треке Кольца — рамку не повесить, светим ореолом */
-.vp-flash-art { animation: artFlash 1s ease-in-out infinite; }
+.vp-flash-art { animation: artFlash 1.5s ease-in-out infinite; }
 @keyframes artFlash {
-  0%,100% { filter: drop-shadow(0 0 2px rgba(212,160,23,0.3)); }
-  50% { filter: drop-shadow(0 0 8px #ffe08a) drop-shadow(0 0 18px rgba(212,160,23,0.9)); }
+  0%,100% { filter: drop-shadow(0 0 2px rgba(190,150,60,0.25)); }
+  50% { filter: drop-shadow(0 0 6px rgba(224,189,110,0.7)) drop-shadow(0 0 13px rgba(190,150,60,0.45)); }
 }
 .vp-flash-art.vp-lose { animation-name: artFlashLose; }
 @keyframes artFlashLose {
-  0%,100% { filter: drop-shadow(0 0 2px rgba(200,70,70,0.3)); }
-  50% { filter: drop-shadow(0 0 8px #ff9c9c) drop-shadow(0 0 18px rgba(200,70,70,0.9)); }
+  0%,100% { filter: drop-shadow(0 0 2px rgba(168,84,84,0.25)); }
+  50% { filter: drop-shadow(0 0 6px rgba(208,140,140,0.7)) drop-shadow(0 0 13px rgba(168,84,84,0.45)); }
 }
 /* ---- ход бота: коротко мигаем тем, что он забрал (карта в раскладке / тайл) ---- */
 .bot-flash {
@@ -636,8 +637,8 @@ img.coin {
 @media (prefers-reduced-motion: reduce) {
   .vp-glow, .vp-flash, .vp-flash-art, .result-badge.win { animation: none; }
   .bot-flash { animation: none; box-shadow: 0 0 26px 9px rgba(255,224,138,0.9); }
-  .vp-flash { box-shadow: 0 0 18px 5px rgba(212,160,23,0.7); }
-  .vp-flash.vp-lose { box-shadow: 0 0 18px 5px rgba(200,70,70,0.7); }
+  .vp-flash { box-shadow: 0 0 14px 3px rgba(196,152,52,0.4); }
+  .vp-flash.vp-lose { box-shadow: 0 0 14px 3px rgba(168,84,84,0.38); }
 }
 
 /* ================= ART ERA: живые компоненты ================= */
@@ -901,9 +902,14 @@ body.cb { --band: 0.265; }
 .hand-card #hand-full { columns: 3 92px; column-gap: 8px; }
 .hand-card .stack-col { break-inside: avoid; margin: 0 auto 8px; }
 /* оверлей истории партии (кнопка 📜 в мобильной шапке) */
-.log-card { max-width: 560px; }
+.log-card {
+  max-width: 560px; width: min(94vw, 560px);
+  max-height: 92vh; display: flex; flex-direction: column; padding: 18px;
+}
 .log-card #log-full {
-  max-height: 62vh; overflow-y: auto; text-align: left;
+  flex: 1 1 auto; min-height: 0; max-height: 74vh;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain; touch-action: pan-y; text-align: left;
   background: rgba(0,0,0,0.25); border: 1px solid #4a3820; border-radius: 8px;
   padding: 8px 10px; font-size: 14px; line-height: 1.45;
 }

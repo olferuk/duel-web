@@ -946,13 +946,18 @@ function colorSides(text) {
     .replace(/Саурон(?:ом|а|у|е)?/g, (m) => `<b class="s">${m}</b>`);
 }
 
+let _logHtml = null;
 function renderLog() {
   const html = coinify(G.log.map((l) => `<div>${colorSides(l)}</div>`).join(""));
+  if (html === _logHtml) return; // ничего не изменилось — не трогаем скролл читателя
+  _logHtml = html;
   for (const id of ["#game-log", "#log-full"]) {
     const el = $(id);
     if (!el) continue;
+    // если читатель отлистал вверх — не дёргаем его вниз при каждом обновлении
+    const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
     el.innerHTML = html;
-    el.scrollTop = el.scrollHeight;
+    if (atBottom) el.scrollTop = el.scrollHeight;
   }
 }
 
@@ -1138,6 +1143,7 @@ async function roomState() {
 // бот ходит мгновенно — мигаем тем, что он забрал, ПОКА оно ещё на экране
 function visibleSnapshot(state) {
   return {
+    chapter: state && state.tableau ? state.tableau.chapter : null,
     slots: new Set(
       (state && state.tableau ? state.tableau.slots : [])
         .filter((s) => s.card)
@@ -1149,13 +1155,20 @@ function visibleSnapshot(state) {
 
 async function flashBotMove(before, next) {
   const now = visibleSnapshot(next);
-  const goneSlot = [...before.slots].find((id) => !now.slots.has(id));
-  const goneTile = [...before.tiles].find((id) => !now.tiles.has(id));
-  const el = goneSlot
-    ? document.querySelector(`#tableau .card[data-slot="${goneSlot}"]`)
-    : goneTile
-      ? document.querySelector(`.tile.art[data-tile="${goneTile}"]`)
-      : null;
+  let el = null;
+  if (before.chapter !== null && now.chapter !== before.chapter) {
+    // забрана ПОСЛЕДНЯЯ карта эпохи: id слотов новой раскладки не сравнить со старыми,
+    // но на экране осталась ровно одна открытая карта — её и мигаем, до смены эпохи
+    el = document.querySelector("#tableau .card.faceup");
+  } else {
+    const goneSlot = [...before.slots].find((id) => !now.slots.has(id));
+    const goneTile = [...before.tiles].find((id) => !now.tiles.has(id));
+    el = goneSlot
+      ? document.querySelector(`#tableau .card[data-slot="${goneSlot}"]`)
+      : goneTile
+        ? document.querySelector(`.tile.art[data-tile="${goneTile}"]`)
+        : null;
+  }
   if (!el) return;
   el.classList.add("bot-flash");
   await new Promise((r) => setTimeout(r, 640)); // две вспышки по ~180 мс + пауза
