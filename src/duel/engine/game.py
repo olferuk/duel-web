@@ -218,6 +218,8 @@ class Game:
             self.alliance_stacks[race] = ids
         self.current = self.rules["first_player"]
         self.extra_turns = 0
+        # предложения доп. хода с трека: спрашиваем ТОЛЬКО когда всё остальное хода отыграно
+        self.extra_offers: list[int] = []
         self.pending: list[dict] = []
         self.turn_no = 1
         self.last_action: list[str | None] = [None, None]
@@ -267,6 +269,7 @@ class Game:
         g.turn_no = self.turn_no
         g.last_action = list(self.last_action)
         g.extra_turns = self.extra_turns
+        g.extra_offers = list(self.extra_offers)
         g.pending = [dict(pd) for pd in self.pending]
         g.winner = self.winner
         g.win_reason = self.win_reason
@@ -373,8 +376,10 @@ class Game:
                 got = self._gain_coins(p, 1)
                 self.log.append(f"Бонус трека: +{got} монета")
             elif b is Space.EXTRA_TURN:
-                # per the owner's ruling the extra turn is OPTIONAL
-                self.pending.append({"type": "extra_turn_offer", "player": p})
+                # per the owner's ruling the extra turn is OPTIONAL.
+                # Спросим в самом конце хода (_settle): иначе игрок берёт доп. ход,
+                # а после него ему доигрывают оставшиеся эффекты карты — выглядит как баг.
+                self.extra_offers.append(p)
                 self.log.append("Бонус трека: право дополнительного хода")
             elif b is Space.UNIT:
                 self.pending.append(
@@ -656,6 +661,17 @@ class Game:
             self.pending.pop(0)  # nothing to do — auto-skip
         if self.winner is not None:
             self.pending.clear()
+            self.extra_offers.clear()
+            return
+        if self.extra_offers:
+            # все эффекты хода отыграны — теперь спрашиваем про дополнительный ход
+            self.pending.append(
+                {
+                    "type": "extra_turn_offer",
+                    "player": self.extra_offers.pop(0),
+                    "why": "бонус трека — дополнительный ход",
+                }
+            )
             return
         self._end_turn()
 

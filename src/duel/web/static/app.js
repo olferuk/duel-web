@@ -749,14 +749,52 @@ function renderPanels() {
   }
 }
 
-const WIN_GLOW = { quest: ".quest", races: ".supply-row", conquest: ".mid-row .board", presence: ".mid-row .board" };
+// финал партии: подсвечиваем не только блок, но и КОНКРЕТНЫЙ индикатор причины
+// (плашка присутствия на карте / счётчик рас / шаги по Пути Кольца) — он мигает.
+function winGlowTargets(reason, side) {
+  switch (reason) {
+    case "quest":
+      return {
+        box: ".quest",
+        chips: [`#quest-vp .race-vp.${side}`],
+        art: [side === "f" ? ".ring-art .ring-strip" : ".ring-art .ring-nazgul"],
+      };
+    case "races":
+      return { box: ".supply-row", chips: [`#race-vps .race-vp.${side}`, "#race-row"], art: [] };
+    case "conquest":
+    case "presence":
+      return { box: ".mid-row .board", chips: [`.map-vp.${side}`], art: [] };
+    default:
+      return null;
+  }
+}
+
+let _winGlowShown = false;
 
 function renderWinGlow() {
-  document.querySelectorAll(".vp-glow").forEach((e) => e.classList.remove("vp-glow"));
-  if (G && G.winner !== null && G.winner !== undefined && G.winner !== "draw") {
-    const sel = WIN_GLOW[G.win_reason];
-    const el = sel && document.querySelector(sel);
-    if (el) el.classList.add("vp-glow");
+  document
+    .querySelectorAll(".vp-glow, .vp-flash, .vp-flash-art")
+    .forEach((e) => e.classList.remove("vp-glow", "vp-flash", "vp-flash-art", "vp-lose"));
+  if (!G || G.winner === null || G.winner === undefined || G.winner === "draw") {
+    _winGlowShown = false;
+    return;
+  }
+  const t = winGlowTargets(G.win_reason, G.winner === 1 ? "s" : "f");
+  if (!t) return;
+  const lost = mySeat() !== G.winner;
+  const mark = (sel, cls) =>
+    document.querySelectorAll(sel).forEach((el) => {
+      el.classList.add(cls);
+      if (lost) el.classList.add("vp-lose");
+    });
+  mark(t.box, "vp-glow");
+  t.chips.forEach((s) => mark(s, "vp-flash"));
+  t.art.forEach((s) => mark(s, "vp-flash-art"));
+  if (!_winGlowShown) {
+    // один раз довозим экран до причины финала — иначе мигание можно не увидеть
+    _winGlowShown = true;
+    const box = document.querySelector(t.box);
+    if (box) setTimeout(() => box.scrollIntoView({ behavior: "smooth", block: "center" }), 400);
   }
 }
 
@@ -777,12 +815,15 @@ function miniLabel(c) {
 
 /* ---------- prompt / turn bar ---------- */
 
+// человеческая причина финала (подписываем ею и мигающий индикатор)
+const WIN_WHY = { quest: "Путь Кольца", races: "поддержка рас", conquest: "покорение Средиземья", presence: "присутствие" };
+
 function renderTurn() {
   const tb = $("#turnbar");
   if (G.winner !== null && G.winner !== undefined) {
     const txt =
       G.winner === "draw" ? "Ничья!" : `Победа: ${SIDE_RU[G.winner]}`;
-    const why = { quest: "Путь Кольца", races: "поддержка рас", conquest: "покорение Средиземья", presence: "присутствие" }[G.win_reason] || "";
+    const why = WIN_WHY[G.win_reason] || "";
     tb.innerHTML = `🏆 ${txt} <small>(${why})</small>`;
     tb.className = "turnbar winner";
   } else {
@@ -800,6 +841,7 @@ function renderTurn() {
 
 const MAP_TYPES = ["place", "move", "kill", "retreat"]; // управляются кликами по карте
 let _mapPendingKey = null;
+let _extraOfferShown = false; // чтобы подскроллить к вопросу ровно один раз
 
 function renderPrompt() {
   const pr = $("#prompt");
@@ -810,6 +852,8 @@ function renderPrompt() {
   const canSkip = all.some((m) => m.type === "skip");
   const btnMoves = all.filter((m) => !MAP_TYPES.includes(m.type) && m.type !== "skip");
   const mapMoves = all.filter((m) => MAP_TYPES.includes(m.type));
+  const isExtraOffer = !!(G.pending && G.pending.type === "extra_turn_offer") && canAct();
+  if (!isExtraOffer) _extraOfferShown = false;
 
   const skipBtn = () => {
     const b = document.createElement("button");
@@ -839,6 +883,24 @@ function renderPrompt() {
     pr.style.display = "";
     pr.innerHTML = `<div class="prompt-title">Шир: выбери видимую карту в раскладке</div>`;
     pr.appendChild(skipBtn());
+  } else if (isExtraOffer && btnMoves.length) {
+    // доп. ход с трека — отдельный явный вопрос, кнопки вверху экрана
+    pr.style.display = "";
+    pr.innerHTML =
+      `<div class="prompt-title">🔄 Бонус трека Кольца: сходить ещё раз?</div>` +
+      `<div class="prompt-btns"></div>`;
+    const box = pr.querySelector(".prompt-btns");
+    for (const m of btnMoves) {
+      const b = document.createElement("button");
+      b.className = "btn small" + (m.take ? "" : " ghost");
+      b.textContent = m.take ? "🔄 Сходить ещё раз" : "➡ Передать ход противнику";
+      b.addEventListener("click", () => doMove(m));
+      box.appendChild(b);
+    }
+    if (!_extraOfferShown) {
+      _extraOfferShown = true; // спросили впервые — покажем вопрос, а не низ страницы
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   } else if (btnMoves.length) {
     // не-картовые выборы (доп. ход, жетоны, расы) — кнопками
     pr.style.display = "";
@@ -897,8 +959,9 @@ function renderMobile() {
 
   const mt = $("#m-turn");
   if (ended) {
+    const why = WIN_WHY[G.win_reason] ? `: ${WIN_WHY[G.win_reason]}` : "";
     mt.textContent =
-      G.winner === seat ? "🏆 Победа!" : G.winner === "draw" ? "🤝 Ничья" : "💀 Поражение";
+      G.winner === seat ? `🏆 Победа${why}` : G.winner === "draw" ? "🤝 Ничья" : `💀 Поражение${why}`;
     mt.className = "";
   } else if (G.waiting) {
     mt.textContent = "⏳ Ждём соперника";
@@ -910,7 +973,20 @@ function renderMobile() {
     mt.textContent = "⏳ Ход соперника…";
     mt.className = "";
   }
-  $("#m-opp").innerHTML = ""; // сводка соперника убрана
+  // сверху справа — жетоны содружества соперника (тап → полный расклад врага)
+  const oppToks = ended ? [] : opp.tokens || []; // в финале место нужно под причину победы
+  $("#m-opp").innerHTML = oppToks.length
+    ? `<span class="opp-toks ${seat === 1 ? "f" : "s"}" id="opp-toks" title="жетоны содружества соперника">🛡` +
+      oppToks
+        .slice(0, 4)
+        .map(
+          (t) =>
+            `<img src="/static/art/tokens/${t.id}.png" class="${t.kind === "instant" ? "used" : ""}">`
+        )
+        .join("") +
+      (oppToks.length > 4 ? `<b>+${oppToks.length - 4}</b>` : "") +
+      `</span>`
+    : "";
 
   // нижний бар: слева мои деньги, справа деньги врага (цвет по фракции)
   const oppSeat = 1 - seat;
@@ -942,9 +1018,32 @@ function renderMobile() {
 }
 
 let handWho = "me"; // "me" | "opp" | "sold"
+
+// сводка игрока в оверлее: деньги/регионы/расы + жетоны содружества (их не видно в доке у врага)
+function handSummary(seat) {
+  const pl = G.players[seat];
+  const toks = pl.tokens.length
+    ? pl.tokens
+        .map(
+          (t) =>
+            `<span class="dock-tok hand-tok"><img src="/static/art/tokens/${t.id}.png" class="${
+              t.kind === "instant" ? "used" : ""
+            }"><span class="tok-tip">${t.text}${
+              t.kind === "instant" ? " <i>(использован)</i>" : ""
+            }</span></span>`
+        )
+        .join("")
+    : `<span class="dock-empty">жетонов содружества пока нет</span>`;
+  return coinify(
+    `<div class="hand-stat">🪙 ${pl.coins} · регионов ${pl.presence}/7 · рас ${pl.race_victory_count}/6</div>` +
+      `<div class="hand-toks">${toks}</div>` +
+      (pl.tokens.length ? `<div class="hand-hint">жетоны содружества — тапни, чтобы прочитать</div>` : "")
+  );
+}
+
 function renderHand() {
   if (!G || G.empty) return;
-  let cards, title;
+  let cards, title, sum = "";
   if (handWho === "sold") {
     cards = G.discard_open || [];
     title = "Проданные / сброшенные";
@@ -952,7 +1051,9 @@ function renderHand() {
     const seat = handWho === "me" ? mySeat() : 1 - mySeat();
     cards = G.players[seat].played;
     title = handWho === "me" ? "Мои карты" : `Карты: ${SIDE_RU[1 - mySeat()]}`;
+    sum = handSummary(seat);
   }
+  $("#hand-sum").innerHTML = sum;
   $("#hand-title").textContent = title;
   $("#hand-me").classList.toggle("on", handWho === "me");
   $("#hand-opp").classList.toggle("on", handWho === "opp");
@@ -1200,6 +1301,9 @@ function openHand(who) {
   renderHand();
   $("#hand-overlay").classList.remove("hidden");
 }
+$("#m-opp").addEventListener("click", (ev) => {
+  if (ev.target.closest(".opp-toks")) { ev.stopPropagation(); openHand("opp"); }
+});
 $("#dock-all").addEventListener("click", () => openHand("me"));
 $("#dock-opp").addEventListener("click", () => openHand("opp"));
 $("#dock-sold").addEventListener("click", () => openHand("sold"));
