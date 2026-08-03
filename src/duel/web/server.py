@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from duel.engine.automa import CHARACTERS, Automa, automa_rules
 from duel.engine.board import EDGES, RACES, REGIONS
 from duel.engine.game import Game
 
@@ -116,57 +117,99 @@ def get_game() -> dict:
 
 
 BOT_MENU = [
+    # ELO — из единой лестницы recompute_elo() от 03.08.2026 (включая матчи автом:
+    # владелец решил, что лестница общая — мера «сложности для игрока», а не режима)
     {
         "id": "galadriel",
-        "label": "👑 Галадриэль · ELO ≈1550",
+        "label": "👑 Галадриэль · ELO ≈1250",
         "desc": "Владычица Лориэна, шестое воплощение династии: союзы шести рас (MCTS-240)",
     },
     {
         "id": "champion",
-        "label": "Гэндальф · ELO ≈1350",
+        "label": "Гэндальф · ELO ≈1100",
         "desc": "Экс-чемпион: глубокий поиск (MCTS-240) + нейросеть w3. Честный, без подглядываний",
     },
     {
         "id": "strong",
-        "label": "Элронд · ELO ≈1230",
+        "label": "Элронд · ELO ≈990",
         "desc": "Тот же мозг, что у Гэндальфа, но вдвое меньше раздумий (MCTS-120 + w3)",
     },
     {
         "id": "mcts",
-        "label": "Арагорн · ELO ≈1160",
+        "label": "Арагорн · ELO ≈1030",
         "desc": "Опытный следопыт: классический Монте-Карло с ручной эвристикой, без нейросетей",
     },
     {
         "id": "frodo",
-        "label": "Фродо · ELO ≈1150 · стиль: Кольцо",
+        "label": "Фродо · ELO ≈1010 · стиль: Кольцо",
         "desc": "Верен миссии: рвётся по Пути Кольца к Роковой горе, порой в ущерб всему прочему",
     },
     {
         "id": "witch_king",
-        "label": "Король-чародей · ELO ≈1245 · стиль: война",
+        "label": "Король-чародей · ELO ≈1105 · стиль: война",
         "desc": "Агрессор: армии, крепости и захват регионов прежде всего",
     },
     {
         "id": "gollum",
-        "label": "Голлум · ELO ≈1210 · стиль: прелесть",
+        "label": "Голлум · ELO ≈1070 · стиль: прелесть",
         "desc": "Копит золото и ищет выгоду. Моя пре-е-елесть",
     },
     {
         "id": "2ply",
-        "label": "Боромир · ELO ≈1040",
+        "label": "Боромир · ELO ≈920",
         "desc": "Смотрит на свой ход и твой ответ — но не дальше (минимакс на 2 хода)",
     },
     {
         "id": "greedy",
-        "label": "Гимли · ELO ≈870",
+        "label": "Гимли · ELO ≈790",
         "desc": "Жадина: берёт лучшее прямо сейчас, не думая о будущем",
     },
     {
         "id": "random",
-        "label": "Пиппин · ELO ≈750",
+        "label": "Пиппин · ELO ≈95",
         "desc": "Дурак Тука: ходит наугад. Идеален для знакомства с правилами",
     },
 ]
+
+
+def _automa_desc(cid: str) -> str:
+    from duel.engine.automa import COLOR_RU, REPEAT_RU
+
+    ch = CHARACTERS[cid]
+    pref = "/".join(COLOR_RU[t] for t in sorted(ch.preferred, key=str))
+    parts = [ch.power_ru, f"предпочитает {pref} карты"]
+    if ch.repeats:
+        parts.append("повтор хода: " + " и ".join(REPEAT_RU[r] for r in sorted(ch.repeats)))
+    return "; ".join(parts)
+
+
+# Соло-вариант: автома играет по печатным правилам (карты решений + кубик d6),
+# а не как обычные боты — отдельная группа в лобби.
+# ELO измерен ареной 03.08.2026 (analysis/automa_eval*.py, ~14k партий):
+# сила — от льготных правил соло-режима (бесплатные карты), не от качества решений.
+AUTOMA_ELO = {
+    "witch_king": 1200,
+    "galadriel": 1170,
+    "tom_bombadil": 1090,
+    "saruman": 1155,
+    "elrond": 1110,
+    "smaug": 1135,
+    "sauron": 1475,
+    "gandalf": 1465,
+    "eowyns_stew": 1380,
+}
+AUTOMA_MENU = [
+    {
+        "id": f"automa-{cid}",
+        "label": f"{ch.name_ru} · ELO ≈{AUTOMA_ELO[cid]}",
+        "desc": _automa_desc(cid),
+        "group": "automa",
+        "art": f"/static/art/solo/{ch.art}",
+    }
+    # сильнейшие первыми, как в основном меню
+    for cid, ch in sorted(CHARACTERS.items(), key=lambda kv: -AUTOMA_ELO[kv[0]])
+]
+BOT_MENU = BOT_MENU + AUTOMA_MENU
 
 
 @app.get("/api/bots")
@@ -238,6 +281,12 @@ def _make_bot(kind: str, seed: int = 7):
     against humans clairvoyance is cheating, and the web is for humans."""
     import re
 
+    if kind.startswith("automa-"):
+        cid = kind[len("automa-") :]
+        if cid not in CHARACTERS:
+            raise HTTPException(400, f"неизвестный персонаж автомы {cid!r}")
+        return Automa(cid, seed=seed)
+
     from duel.ai.mcts import HonestMctsBot
 
     if kind == "champion":
@@ -292,6 +341,8 @@ def _make_bot(kind: str, seed: int = 7):
 def bot_step(kind: str = "mcts") -> dict:
     """Have the bot make one move for the current player."""
     _legacy_guard()
+    if kind.startswith("automa-"):
+        raise HTTPException(400, "автома играет только в комнатах (нужны её правила в партии)")
     g: Game | None = state["game"]
     if g is None:
         raise HTTPException(400, "no game")
@@ -376,6 +427,8 @@ def _payload(rid: str, room: dict, seat: int | None) -> dict:
         bot_kind=room["bot_kind"],
         bot_seat=room["bot_seat"],
     )
+    if isinstance(room.get("bot"), Automa):
+        d["automa"] = room["bot"].to_dict()
     return d
 
 
@@ -408,17 +461,21 @@ def room_new(body: NewRoom, request: Request) -> dict:
     token = secrets.token_urlsafe(9)
     side = 1 if body.side == 1 else 0
     bot = bot_kind = bot_seat = None
+    rules = None
     if body.mode == "bot":
         bot_kind = body.bot or "mcts"
         bot = _make_bot(bot_kind, seed=int(time.time()) % 100_000)
         bot_seat = 1 - side
         seats = {side: token, bot_seat: "__bot__"}
+        if isinstance(bot, Automa):
+            # партия должна знать об автоме: бесплатные карты, цены тайлов, силы
+            rules = {"automa": automa_rules(bot.character, bot_seat)}
     elif body.mode == "hotseat":
         seats = {0: token, 1: token}
     else:
         seats = {side: token, 1 - side: None}
     ROOMS[rid] = {
-        "game": Game(seed=body.seed, promo=body.promo),
+        "game": Game(seed=body.seed, promo=body.promo, rules=rules),
         "mode": body.mode,
         "seats": seats,
         "bot": bot,
@@ -500,6 +557,9 @@ def room_bot_step(rid: str, body: RoomToken) -> dict:
         finally:
             _BOT_SLOTS.release()
         g.apply(mv)
+        after = getattr(room["bot"], "after_apply", None)
+        if after is not None:
+            after(g, mv)
         room["version"] += 1
         room["ts"] = time.time()
     return _payload(rid, room, seat)

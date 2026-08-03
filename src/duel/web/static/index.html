@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Дуэль за Средиземье — прототип</title>
-<link rel="stylesheet" href="/static/style.css?v=53">
+<link rel="stylesheet" href="/static/style.css?v=55">
 </head>
 <body>
 
@@ -29,6 +29,9 @@
     <div class="lobby-section hidden" id="lobby-bot-opts">
       <div class="bot-pick-title">Выбери соперника:</div>
       <div class="bot-pick" id="bot-pick"></div>
+      <div class="bot-pick-title automa-title">🎲 Автома — соло-режим по печатным правилам
+        <small>решения по картам и кубику, как в настольном соло-варианте</small></div>
+      <div class="bot-pick automa-pick" id="automa-pick"></div>
       <div class="bot-desc" id="bot-desc"></div>
       <label>Я играю за:
         <select id="side-select">
@@ -37,7 +40,7 @@
           <option value="1">Саурона</option>
         </select>
       </label>
-      <label class="chk"><input type="checkbox" id="promo"> Промо-тайлы</label>
+      <label class="chk"><input type="checkbox" id="promo" autocomplete="off"> Промо-тайлы</label>
       <label class="chk"><input type="checkbox" id="cb-bot"> Режим для дальтоников</label>
       <div class="lobby-btns">
         <button class="btn" id="start-bot">Начать партию</button>
@@ -53,7 +56,7 @@
           <option value="1">Саурона</option>
         </select>
       </label>
-      <label class="chk"><input type="checkbox" id="pvp-promo"> Промо-тайлы</label>
+      <label class="chk"><input type="checkbox" id="pvp-promo" autocomplete="off"> Промо-тайлы</label>
       <label class="chk"><input type="checkbox" id="cb-pvp"> Режим для дальтоников</label>
       <div class="lobby-btns">
         <button class="btn" id="start-pvp">Создать комнату</button>
@@ -111,6 +114,25 @@
   </div>
 </div>
 
+<!-- автома: как соло-бот принимает решения (тап по бару автомы) -->
+<div class="modal hidden" id="automa-overlay">
+  <div class="modal-card automa-card">
+    <h2 id="automa-title">🎲 Автома</h2>
+    <div class="automa-head">
+      <img id="automa-art" alt="персонаж автомы" draggable="false">
+      <div class="automa-info">
+        <div id="automa-power"></div>
+        <div id="automa-deckinfo" class="small"></div>
+      </div>
+    </div>
+    <div class="automa-sub">Текущая карта решения</div>
+    <div id="automa-decision"></div>
+    <div class="automa-sub">Ход рассуждений</div>
+    <div class="automa-trace" id="automa-trace"></div>
+    <div class="lobby-btns"><button class="btn" id="automa-close">Закрыть</button></div>
+  </div>
+</div>
+
 <!-- мобильный статус-бар (сверху) -->
 <div id="m-top">
   <button class="btn small" id="m-lobby">←</button>
@@ -157,6 +179,8 @@
     </header>
 
     <section class="turnbar" id="turnbar">Нажми «Новая партия»</section>
+    <section class="automa-bar hidden" id="automa-bar" role="button" tabindex="0"
+      title="Как автома принимает решения"></section>
     <section class="prompt" id="prompt" style="display:none"></section>
 
     <section class="supply-row">
@@ -193,6 +217,6 @@
   </aside>
 
 </div>
-<script src="/static/app.js?v=49"></script>
+<script src="/static/app.js?v=51"></script>
 </body>
 </html>

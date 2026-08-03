@@ -181,7 +181,15 @@ DEFAULT_RULES = {
     "start_coins": (3, 2),  # (fellowship, sauron)
     "discard_payout": (1, 2, 3),  # coins per discard in chapters 1/2/3
     "first_player": SAURON,
+    # Соло-вариант (автома): {"side": 0|1, "powers": [...]} или None.
+    # Автома берёт карты бесплатно (без навыков, цепочек и монет), никогда не
+    # сбрасывает карты ради монет, а ориентиры покупает за 7/5/2 монеты
+    # (+1 за каждую свою крепость). "powers" — силы персонажа (automa.py).
+    "automa": None,
 }
+
+# базовая цена ориентира для автомы по эпохам (соло-вариант, стр. 2)
+AUTOMA_TILE_BASE = (7, 5, 2)
 
 
 class Game:
@@ -225,7 +233,12 @@ class Game:
         self.last_action: list[str | None] = [None, None]
         self.winner: int | str | None = None  # 0 | 1 | "draw"
         self.win_reason: str | None = None
-        self.log: list[str] = ["Партия началась. Ходит Саурон."]
+        self.promo = promo
+        # режим партии — первой строкой лога: «а стояла ли галочка промо?»
+        # должно быть видно и через час после старта
+        self.log: list[str] = [
+            "Партия началась. Ходит Саурон." + (" Промо-тайлы: вкл." if promo else "")
+        ]
 
     # ---------- fast copy for search ----------
 
@@ -273,6 +286,7 @@ class Game:
         g.pending = [dict(pd) for pd in self.pending]
         g.winner = self.winner
         g.win_reason = self.win_reason
+        g.promo = self.promo
         g.log = _NullLog()
         return g
 
@@ -397,9 +411,25 @@ class Game:
                     {"type": "remove_fortress", "player": p, "optional": True, "why": "бонус трека"}
                 )
 
+    # ---------- automa helpers ----------
+
+    def automa_side(self) -> int | None:
+        a = self.rules.get("automa")
+        return a["side"] if a else None
+
+    def is_automa(self, p: int) -> bool:
+        return self.automa_side() == p
+
+    def _apower(self, p: int, power: str) -> bool:
+        a = self.rules.get("automa")
+        return bool(a) and a["side"] == p and power in a.get("powers", ())
+
     # ---------- cost ----------
 
     def card_cost(self, p: int, card: Card) -> dict:
+        if self.is_automa(p):
+            # автоме не нужны навыки, цепочки и монеты для карт глав
+            return {"coins": 0, "chained": False}
         player = self.players[p]
         if card.takes_link and card.takes_link in player.links:
             return {"coins": 0, "chained": True}
@@ -408,8 +438,10 @@ class Game:
 
     def tile_cost(self, p: int, lm: Landmark) -> dict:
         player = self.players[p]
-        miss = missing_skills(lm.cost, player)
         surcharge = 0 if "dwarves_free_tile" in player.tokens else self.forts_on_board(p)
+        if self.is_automa(p):
+            return {"coins": AUTOMA_TILE_BASE[self.chapter - 1] + surcharge, "chained": False}
+        miss = missing_skills(lm.cost, player)
         return {"coins": miss + surcharge, "chained": False}
 
     # ---------- legal moves ----------
@@ -447,12 +479,13 @@ class Game:
                         "chained": cost["chained"],
                     }
                 )
-            gain = self.rules["discard_payout"][self.chapter - 1] * (
-                2 if "humans_double_discard" in self.players[p].tokens else 1
-            )
-            moves.append(
-                {"type": "discard", "slot": sid, "label": f"Сбросить (+{gain}🪙)", "gain": gain}
-            )
+            if not self.is_automa(p):  # автома НИКОГДА не сбрасывает карты ради монет
+                gain = self.rules["discard_payout"][self.chapter - 1] * (
+                    2 if "humans_double_discard" in self.players[p].tokens else 1
+                )
+                moves.append(
+                    {"type": "discard", "slot": sid, "label": f"Сбросить (+{gain}🪙)", "gain": gain}
+                )
         for lm_id in self.landmarks_faceup:
             lm = LM_BY_ID[lm_id]
             cost = self.tile_cost(p, lm)
@@ -614,9 +647,13 @@ class Game:
             self._pay_coins(p, cost["coins"])
             self.players[p].add_card(card)
             chained = cost["chained"]
-            msg = f"Ход {self.turn_no} — {SIDE_RU[p]} играет {card_label(card)}" + (
-                " по цепочке" if chained else f" за {cost['coins']}🪙"
-            )
+            if chained:
+                how = " по цепочке"
+            elif self.is_automa(p):
+                how = " (автома — бесплатно)"
+            else:
+                how = f" за {cost['coins']}🪙"
+            msg = f"Ход {self.turn_no} — {SIDE_RU[p]} играет {card_label(card)}" + how
             self.log.append(msg)
             self.last_action[p] = msg
             self.turn_no += 1
@@ -708,17 +745,23 @@ class Game:
 
     def _card_effects(self, p: int, card: Card) -> None:
         toks = self.players[p].tokens
+        # сила Тома Бомбадила / Похлёбки Эовин: +3🪙 за карту с символом цепочки
+        if self._apower(p, "chain_coins3") and card.takes_link:
+            got = self._gain_coins(p, 3)
+            self.log.append(f"Сила персонажа: +{got}🪙 за символ цепочки")
         if card.type is CardType.YELLOW:
             got = self._gain_coins(p, card.coins)
             self.log.append(f"+{got}🪙")
-            if "humans_yellow_quest" in toks:
+            if "humans_yellow_quest" in toks or self._apower(p, "yellow_quest"):
                 self._advance_quest(p, 1)
             if "elves_extra_turn" in toks:
                 self.extra_turns += 1
                 self.log.append("Эльфы: дополнительный ход")
         elif card.type is CardType.BLUE:
             self._advance_quest(p, card.quest_steps)
-            if "hobbits_blue_unit" in toks and self.winner is None:
+            if (
+                "hobbits_blue_unit" in toks or self._apower(p, "blue_unit")
+            ) and self.winner is None:
                 self.pending.append(
                     {
                         "type": "place_units",
@@ -726,11 +769,13 @@ class Game:
                         "n": 1,
                         "regions": list(REGION_KEYS),
                         "optional": True,
-                        "why": "Хоббиты",
+                        "why": "Хоббиты" if "hobbits_blue_unit" in toks else "сила персонажа",
                     }
                 )
         elif card.type is CardType.RED:
-            n = card.troops + (1 if "humans_red_extra" in toks else 0)
+            n = card.troops + (
+                1 if "humans_red_extra" in toks or self._apower(p, "red_extra") else 0
+            )
             regions = list(REGION_KEYS) if "elves_red_any" in toks else list(card.destinations)
             self.pending.append({"type": "place_units", "player": p, "n": n, "regions": regions})
         elif card.type is CardType.GREEN:
@@ -758,7 +803,7 @@ class Game:
         self._check_races(p)
         if self.winner is not None:
             return
-        if "dwarves_green_moves" in player.tokens:
+        if "dwarves_green_moves" in player.tokens or self._apower(p, "green_moves2"):
             self.pending.append({"type": "movements", "player": p, "n": 2})
         race = card.race
         assert race is not None
@@ -829,6 +874,16 @@ class Game:
         # no effect code ever queries instant ids, so keeping them is safe
         self.players[p].tokens.append(token_id)
         if tk.kind == "passive":
+            # соло-вариант: автома не умеет играть по цепочке, поэтому жетон
+            # хоббитов даёт ей 3 монеты РАЗОВО при получении (Том Бомбадил и
+            # Похлёбка Эовин — исключение: у них цепочная сила уже есть)
+            if (
+                token_id == "hobbits_chain_coins"
+                and self.is_automa(p)
+                and not self._apower(p, "chain_coins3")
+            ):
+                got = self._gain_coins(p, 3)
+                self.log.append(f"Автома: +{got}🪙 разово за жетон хоббитов")
             self._check_races(p)
             return
         if token_id == "ents_extra_turn":
@@ -1021,6 +1076,7 @@ class Game:
         return {
             "chapter": self.chapter,
             "current": self.current,
+            "promo": self.promo,
             "turn_no": self.turn_no,
             "winner": self.winner,
             "win_reason": self.win_reason,

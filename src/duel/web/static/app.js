@@ -670,7 +670,7 @@ function renderLandmarks() {
       .join("") || '<div class="area-hint">нет открытых тайлов</div>');
   if (G.landmarks_deck > 0)
     $("#landmark-row").innerHTML +=
-      `<div class="tile art stack" title="Закрытые тайлы в стопке">` +
+      `<div class="tile art stack" title="Закрытые тайлы в стопке (промо-тайлы: ${G.promo ? "в игре" : "выключены"})">` +
       `<img draggable="false" src="/static/art/landmarks/_back.jpg"><small>×${G.landmarks_deck}</small></div>`;
   _tileBuy = movesByTile;
   // покупка тайла — коротким тапом/кликом (тултип — по долгому нажатию)
@@ -1108,6 +1108,77 @@ function renderHand() {
       .join("") || "<p class='small'>карт пока нет</p>";
 }
 
+/* ---------- автома: карта решения и ход рассуждений ---------- */
+
+const DEC_COLORS = {
+  grey: "#8f96a3", yellow: "#d9b23a", green: "#3f9d4e",
+  blue: "#2f6fb8", red: "#c0392b", purple: "#8e44ad",
+};
+const DEC_REP_ICON = { shelob: "🕷", grond: "🐏" };
+
+function decSlotHtml(slot) {
+  const cols = slot.colors.map((c) => DEC_COLORS[c] || "#888");
+  let bg = cols[0];
+  if (cols.length === 2) bg = `linear-gradient(135deg, ${cols[0]} 0 50%, ${cols[1]} 50% 100%)`;
+  if (cols.length >= 3)
+    bg = `linear-gradient(135deg, ${cols[0]} 0 33%, ${cols[1]} 33% 66%, ${cols[2]} 66% 100%)`;
+  return `<span class="dec-slot${slot.pref ? " pref" : ""}" style="background:${bg}"
+    title="${slot.label}">${slot.pref ? "★" : ""}</span>`;
+}
+
+function decCardHtml(card) {
+  if (!card) return `<span class="dec-none">карта решения ещё не вскрыта</span>`;
+  const slots = card.slots.map(decSlotHtml).join(`<span class="dec-arrow">›</span>`);
+  const rep = card.repeat
+    ? `<span class="dec-rep${card.repeat_matches ? " hit" : ""}"
+        title="Символ повтора хода${card.repeat_matches ? " — совпадает с персонажем: доп. ход!" : " (у этого персонажа не срабатывает)"}">${DEC_REP_ICON[card.repeat]}</span>`
+    : "";
+  const dirTip = card.direction === "lr" ? "скан раскладки слева направо" : "скан раскладки справа налево";
+  return `<span class="dec-card">${slots}${rep}
+    <span class="dec-dir" title="${dirTip}">${card.direction === "lr" ? "→" : "←"}</span></span>`;
+}
+
+function renderAutoma() {
+  const bar = $("#automa-bar");
+  if (!bar) return;
+  const a = G && G.automa;
+  if (!a) { bar.classList.add("hidden"); return; }
+  bar.classList.remove("hidden");
+  const lastDie = [...(a.trace || [])].reverse().find((t) => t.kind === "die");
+  bar.innerHTML =
+    `<img class="automa-mini" src="/static/art/solo/${a.art}" alt="" draggable="false">` +
+    `<span class="automa-name">${a.name} <small>· автома</small></span>` +
+    decCardHtml(a.card) +
+    (lastDie ? `<span class="automa-die">🎲 ${lastDie.roll}</span>` : "") +
+    `<span class="automa-more">как думает ›</span>`;
+  if (!$("#automa-overlay").classList.contains("hidden")) fillAutomaOverlay();
+}
+
+function fillAutomaOverlay() {
+  const a = G && G.automa;
+  if (!a) return;
+  $("#automa-title").textContent = `🎲 ${a.name} — автома`;
+  $("#automa-art").src = `/static/art/solo/${a.art}`;
+  $("#automa-power").innerHTML = `<b>Свойства персонажа:</b> ${a.power}`;
+  $("#automa-deckinfo").textContent =
+    `Колода решений: ${a.deck} в стопке · ${a.discarded} в сбросе · играет карты бесплатно, ` +
+    `ориентиры за монеты (7/5/2 + крепости)`;
+  let dec = decCardHtml(a.card);
+  if (a.card) {
+    dec += `<ol class="dec-legend">${a.card.slots
+      .map((s) => `<li>${s.label}</li>`)
+      .join("")}</ol>`;
+    dec += `<div class="dec-note">Порядок слотов — приоритет выбора карты; стрелка — направление
+      обхода раскладки${a.card.repeat ? `; ${DEC_REP_ICON[a.card.repeat]} — символ повтора хода` : ""}.</div>`;
+  }
+  $("#automa-decision").innerHTML = dec;
+  const tr = $("#automa-trace");
+  tr.innerHTML = (a.trace || [])
+    .map((t) => `<div class="tr-${t.kind}">${t.text}</div>`)
+    .join("") || "<div>автома ещё не ходила</div>";
+  tr.scrollTop = tr.scrollHeight;
+}
+
 /* ---------- main render / actions ---------- */
 
 function renderAll() {
@@ -1123,9 +1194,13 @@ function renderAll() {
   renderLog();
   renderWinGlow();
   renderMobile();
+  renderAutoma();
 }
 
 /* ---------- rooms: bot / pvp / hotseat ---------- */
+
+const PROMO_CHIP =
+  ' <span class="promo-chip" title="В партии участвуют промо-тайлы Шир и Гронд">промо</span>';
 
 function setRoom(resp) {
   ROOM = { id: resp.room, token: resp.token || (ROOM && ROOM.token), seat: resp.seat ?? (ROOM && ROOM.seat), mode: resp.mode };
@@ -1142,6 +1217,7 @@ function setRoom(resp) {
   } else {
     info.textContent = "hot-seat";
   }
+  if (resp.promo) info.innerHTML += PROMO_CHIP;
   renderAll();
 }
 
@@ -1243,20 +1319,33 @@ async function loadBotMenu() {
   try {
     const resp = await api("/api/bots");
     const box = $("#bot-pick");
+    const abox = $("#automa-pick");
     box.innerHTML = "";
+    abox.innerHTML = "";
+    const markPicked = (btn) =>
+      document
+        .querySelectorAll("#bot-pick .bot-opt, #automa-pick .bot-opt")
+        .forEach((b) => b.classList.toggle("on", b === btn));
     for (const m of resp.menu || []) {
+      const isAutoma = m.group === "automa";
       const btn = document.createElement("button");
-      btn.className = "btn bot-opt";
+      btn.className = "btn bot-opt" + (isAutoma ? " automa" : "");
       btn.dataset.id = m.id;
       btn.dataset.desc = m.desc || "";
-      btn.innerHTML = m.label; // в label уже есть эмодзи (👑, и т.п.)
+      // у автомы — карточка персонажа с артом, у обычных ботов label с эмодзи
+      btn.innerHTML = isAutoma
+        ? `<img src="${m.art}" alt="" draggable="false"><span>${m.label}</span>`
+        : m.label;
       btn.addEventListener("click", () => {
         pickedBot = m.id;
-        box.querySelectorAll(".bot-opt").forEach((b) => b.classList.toggle("on", b === btn));
+        markPicked(btn);
         $("#bot-desc").textContent = m.desc || "";
       });
-      box.appendChild(btn);
+      (isAutoma ? abox : box).appendChild(btn);
     }
+    document
+      .querySelector(".automa-title")
+      .classList.toggle("hidden", !abox.querySelector(".bot-opt"));
     const first = box.querySelector(".bot-opt");
     if (first) first.click(); // выбрать первого (чемпионку) по умолчанию
   } catch (e) {
@@ -1301,7 +1390,7 @@ document.querySelectorAll("[data-back]").forEach((b) =>
 );
 
 $("#start-bot").addEventListener("click", async () => {
-  const picked = $(`#bot-pick .bot-opt.on`);
+  const picked = document.querySelector("#bot-pick .bot-opt.on, #automa-pick .bot-opt.on");
   let resp;
   try {
     resp = await post("/api/room/new", {
@@ -1317,6 +1406,7 @@ $("#start-bot").addEventListener("click", async () => {
   setRoom(resp);
   ROOM.botLabel = picked ? picked.textContent : pickedBot;
   $("#room-info").textContent = `против бота: ${ROOM.botLabel}`;
+  if (resp.promo) $("#room-info").innerHTML += PROMO_CHIP;
   hideLobby();
   await botIfNeeded(); // if the bot's side opens the game
 });
@@ -1397,6 +1487,19 @@ $("#m-log").addEventListener("click", async () => {
 });
 $("#log-close").addEventListener("click", () => $("#log-overlay").classList.add("hidden"));
 
+// автома: бар открывает оверлей «как думает»
+function openAutoma() {
+  if (!G || !G.automa) return;
+  fillAutomaOverlay();
+  $("#automa-overlay").classList.remove("hidden");
+}
+$("#automa-bar").addEventListener("click", openAutoma);
+$("#automa-bar").addEventListener("keydown", (e) => {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openAutoma(); }
+});
+$("#automa-close").addEventListener("click", () => $("#automa-overlay").classList.add("hidden"));
+closeOnBackdrop("#automa-overlay");
+
 // оверлей теперь листается целиком — свайп не должен считаться тапом по фону
 function closeOnBackdrop(id) {
   const ov = $(id);
@@ -1432,6 +1535,12 @@ $("#confirm-modal").addEventListener("click", (ev) => {
 });
 
 (async function init() {
+  // браузеры восстанавливают состояние чекбоксов после перезагрузки (bfcache) —
+  // промо-режим включался «сам собой»; в лобби всегда стартуем с выключенного
+  for (const id of ["promo", "pvp-promo"]) {
+    const el = document.getElementById(id);
+    if (el) el.checked = false;
+  }
   BOARD = await api("/api/board");
   renderMap();
   await loadBotMenu();

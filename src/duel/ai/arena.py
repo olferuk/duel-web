@@ -13,8 +13,18 @@ MAX_MOVES = 600
 
 
 def play_game(bot0: Bot, bot1: Bot, seed: int) -> int | str:
-    """bot0 plays Fellowship (player 0), bot1 plays Sauron. Returns winner."""
-    g = Game(seed=seed)
+    """bot0 plays Fellowship (player 0), bot1 plays Sauron. Returns winner.
+
+    Боты с особыми правилами партии (автома соло-варианта) объявляют их через
+    duck-typed хук ``game_rules(side)``; хук ``after_apply(game, move)``
+    вызывается после применения хода (сверка повтора хода автомы).
+    """
+    rules: dict | None = None
+    for side, bot in ((0, bot0), (1, bot1)):
+        hook = getattr(bot, "game_rules", None)
+        if hook is not None:
+            rules = {**(rules or {}), **hook(side)}
+    g = Game(seed=seed, rules=rules)
     bots = {0: bot0, 1: bot1}
     bot0.new_game()
     bot1.new_game()
@@ -22,8 +32,12 @@ def play_game(bot0: Bot, bot1: Bot, seed: int) -> int | str:
         if g.winner is not None:
             return g.winner
         actor = g.pending[0]["player"] if g.pending else g.current
-        move = bots[actor].choose(g)
+        bot = bots[actor]
+        move = bot.choose(g)
         g.apply(move)
+        after = getattr(bot, "after_apply", None)
+        if after is not None:
+            after(g, move)
     return "draw"
 
 
