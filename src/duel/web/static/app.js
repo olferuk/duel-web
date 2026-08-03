@@ -832,7 +832,9 @@ function renderTurn() {
   } else {
     let who = "";
     if (ROOM && ROOM.mode !== "hotseat")
-      who = actorSeat() === ROOM.seat ? " — твой ход" : ROOM.mode === "bot" ? "" : " — ждём соперника";
+      who = actorSeat() === ROOM.seat
+        ? " — твой ход"
+        : ["bot", "tutorial"].includes(ROOM.mode) ? "" : " — ждём соперника";
     if (G.waiting) who = " — ⏳ соперник ещё не подключился";
     tb.innerHTML = `Эпоха ${G.chapter} · ход ${G.turn_no} · ходит: <b class="${G.current ? "s" : "f"}">${SIDE_RU[G.current]}</b>${who}`;
     tb.className = "turnbar";

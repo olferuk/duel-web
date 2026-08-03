@@ -35,8 +35,8 @@
     {
       type: "info",
       hl: [".quest"],
-      text: "<b>Третий — Кольцо:</b> довести Фродо и Сэма до Роковой горы (или, за " +
-        "Саурона, догнать их назгулом) на этом треке.",
+      text: "<b>Третий — Кольцо:</b> довести Фродо и Сэма до Роковой горы по этому " +
+        "треку. А Саурон побеждает, когда назгул догонит Фродо и Сэма.",
     },
     {
       type: "info",
@@ -102,8 +102,9 @@
       match: { type: "play", slot: 12 },
       hl: ['#tableau .card[data-slot="12"]'],
       text: "И <b>синяя карта</b> «Кольцо» — возьми: Фродо и Сэм сделают шаг к " +
-        "Роковой горе. На треке попадаются клетки с бонусами — монеты, юниты и " +
-        "даже дополнительный ход.",
+        "Роковой горе. Важно: назгул при этом <b>не отстаёт</b> — его полоса тянется " +
+        "следом, так что разрыв между вами может лишь сохраняться или сокращаться. " +
+        "На клетках трека попадаются бонусы — монеты, юниты и даже дополнительный ход.",
     },
     { type: "bot", text: "Ход Саурона.", btn: "⚔️ Ход Саурона" },
     {
@@ -116,9 +117,10 @@
     {
       type: "info",
       hl: ["#race-row"],
-      text: "И <b>жетоны союзов</b>: собрал 2 одинаковых символа расы — берёшь " +
-        "верхний жетон её стопки; 3 разных — жетон любой из этих рас (раз за " +
-        "партию). Эффекты — от лишних ходов до юнитов и монет.",
+      text: "И <b>жетоны союзов</b>: собрал 2 одинаковых символа расы — открываешь " +
+        "<b>два</b> верхних жетона её стопки и оставляешь себе один. Собрал 3 разных " +
+        "значка — открываешь верхний жетон каждой из трёх стопок и оставляешь один " +
+        "(такое — раз за партию). Эффекты — от лишних ходов до юнитов и монет.",
     },
     {
       type: "end",
@@ -173,6 +175,37 @@
     }
   }
 
+  // панель живёт РЯДОМ с тем, о чём рассказывает: под целью (или над, если снизу
+  // не влезает), в координатах документа — скроллится вместе с целью.
+  // Шаги без цели (приветствие, финал) — по центру экрана.
+  function positionPanel() {
+    if (!panel) return;
+    const s = step();
+    const target = s && s.hl ? document.querySelector(s.hl[0]) : null;
+    if (!target) {
+      panel.classList.add("tut-center");
+      panel.style.left = "";
+      panel.style.top = "";
+      return;
+    }
+    panel.classList.remove("tut-center");
+    const r = target.getBoundingClientRect();
+    const pw = panel.offsetWidth;
+    const ph = panel.offsetHeight;
+    let left = window.scrollX + r.left + r.width / 2 - pw / 2;
+    left = Math.max(6, Math.min(left, window.scrollX + window.innerWidth - pw - 6));
+    // предпочитаем место НАД целью: под карточкой раскрывается меню «Сыграть/
+    // Продать», и панель снизу перекрывала бы его
+    let top;
+    if (r.top - ph - 14 >= 6) {
+      top = window.scrollY + r.top - ph - 10; // над целью
+    } else {
+      top = window.scrollY + Math.min(r.bottom + 10, window.innerHeight - ph - 6); // под целью
+    }
+    panel.style.left = left + "px";
+    panel.style.top = top + "px";
+  }
+
   function advance() {
     idx += 1;
     if (idx >= STEPS.length) {
@@ -183,7 +216,11 @@
     const s = step();
     if (s && s.hl && s.hl.length) {
       const el = document.querySelector(s.hl[0]);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        // плавный скролл асинхронный — доводим позицию панели после него
+        setTimeout(positionPanel, 380);
+      }
     }
   }
 
@@ -217,6 +254,7 @@
     }
     // move-шаги — без кнопок: ученик делает подсвеченный ход
     applyHl();
+    positionPanel();
   }
 
   // ход ученика разрешён, только если совпадает с рельсами текущего шага
@@ -240,8 +278,16 @@
 
   // перерисовки уничтожают подсвеченные элементы — восстанавливаем метки
   function onRender() {
-    if (active()) applyHl();
+    if (!active()) return;
+    applyHl();
+    positionPanel();
   }
+
+  let _rz;
+  window.addEventListener("resize", () => {
+    clearTimeout(_rz);
+    _rz = setTimeout(() => active() && positionPanel(), 150);
+  });
 
   window.TUT = { active, start, stop, allowMove, allowBot, onMoved, onRender };
 })();

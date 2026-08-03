@@ -127,7 +127,7 @@ body {
 
 .chooser {
   position: absolute;
-  z-index: 50;
+  z-index: 350; /* поверх панели туториала (300): выбор «Сыграть/Продать» всегда кликабелен */
   display: flex; flex-direction: column; gap: 4px;
   background: #241c12;
   border: 1px solid var(--accent);
@@ -1222,15 +1222,20 @@ body.cb { --band: 0.265; }
   border-radius: 9px; padding: 1px 8px; font-size: 12px; color: #d4a017; }
 
 /* ======================= ТУТОРИАЛ ======================= */
-/* панель коуча: фикс внизу, над мобильным доком; текст + кнопка шага */
+/* панель коуча ЯКОРИТСЯ к цели шага (абсолютные координаты документа —
+   скроллится вместе с целью); шаги без цели центрируются на экране */
 #tut-panel {
-  position: fixed; left: 50%; transform: translateX(-50%);
-  bottom: 14px; z-index: 300;
-  width: min(560px, calc(100vw - 16px));
+  position: absolute; z-index: 300;
+  width: min(420px, calc(100vw - 16px));
   background: #241c12; border: 2px solid #b08d3f; border-radius: 12px;
   padding: 12px 14px; color: var(--parchment);
   box-shadow: 0 8px 30px rgba(0,0,0,0.75);
   font-size: 15px; line-height: 1.45;
+}
+#tut-panel.tut-center {
+  position: fixed; left: 50% !important; top: 50% !important;
+  transform: translate(-50%, -50%);
+  width: min(560px, calc(100vw - 16px));
 }
 #tut-panel b { color: #d4a017; }
 #tut-panel b.f { color: #9fc3ea; }
@@ -1250,13 +1255,8 @@ body.cb { --band: 0.265; }
   .tut-hl { animation: none; }
 }
 
-@media (min-width: 821px) {
-  /* десктоп: панель коуча в правом нижнем углу — не заслоняет раскладку */
-  #tut-panel { left: auto; right: 16px; transform: none; width: 390px; }
-}
 @media (max-width: 820px) {
-  /* панель коуча над нижним доком, не перекрывая его кнопки */
-  #tut-panel { bottom: calc(178px + env(safe-area-inset-bottom, 0px)); font-size: 14px; }
+  #tut-panel { font-size: 14px; }
 }
 @media (max-width: 360px) {
   #tut-panel { padding: 9px 10px; font-size: 13px; }
