@@ -416,17 +416,19 @@ function renderTableau() {
     })
   );
 
-  // мобильный масштаб: раскладка ВСЕГДА влезает по ширине — никакого горизонтального скролла.
+  // Раскладка ВСЕГДА влезает по ширине своей колонки — и на мобиле, и на десктопе:
+  // иначе absolute-карты вылезают из блока ПОД карту регионов и их тапы перехватываются
+  // (давний десктопный баг на 1440px, пойман e2e туториала).
   // zoom (в отличие от transform) меняет и layout-бокс → высота блока тоже ужимается.
-  if (isMobile) {
-    const avail = el.parentElement.clientWidth - 2;
-    const fit = Math.min(1, avail / width);
+  el.style.zoom = "";
+  el.style.width = ""; // сброс перед замером: колонка сама скажет свою ширину
+  const avail = el.clientWidth - 2;
+  const fit = Math.min(1, avail / width);
+  if (fit < 1) {
     el.style.width = width + "px";
     el.style.zoom = fit;
     el.style.minHeight = height + "px";
   } else {
-    el.style.zoom = "";
-    el.style.width = "";
     el.style.minHeight = height + "px";
   }
 }
@@ -1195,6 +1197,7 @@ function renderAll() {
   renderWinGlow();
   renderMobile();
   renderAutoma();
+  if (window.TUT) TUT.onRender(); // перерисовка стирает подсветку шага — вернуть
 }
 
 /* ---------- rooms: bot / pvp / hotseat ---------- */
@@ -1212,6 +1215,8 @@ function setRoom(resp) {
     info.innerHTML = `PvP-комната <code>${resp.room}</code>
       <button class="btn small" id="topbar-copy">📋 ссылка</button>`;
     $("#topbar-copy").addEventListener("click", () => navigator.clipboard.writeText(link));
+  } else if (resp.mode === "tutorial") {
+    info.textContent = "🎓 обучение";
   } else if (resp.mode === "bot") {
     info.textContent = `против бота: ${ROOM.botLabel || resp.bot_kind}`;
   } else {
@@ -1267,9 +1272,23 @@ async function flashBotMove(before, next) {
   el.classList.remove("bot-flash");
 }
 
+// один ход бота по кнопке шага туториала (сам botIfNeeded в туториале молчит)
+window.tutBotStep = async function () {
+  if (!ROOM || !G) return;
+  let guard = 0;
+  while (G.winner === null && actorSeat() === G.bot_seat && guard++ < 10) {
+    const before = visibleSnapshot(G);
+    const next = await post(`/api/room/${ROOM.id}/bot_step`, { token: ROOM.token });
+    await flashBotMove(before, next);
+    G = next;
+    renderAll();
+  }
+};
+
 let botBusy = false;
 async function botIfNeeded() {
-  if (!ROOM || ROOM.mode !== "bot" || botBusy) return;
+  if (!ROOM || !["bot", "tutorial"].includes(ROOM.mode) || botBusy) return;
+  if (window.TUT && !TUT.allowBot()) return; // в туториале бот ходит по кнопке шага
   botBusy = true;
   try {
     let guard = 0;
@@ -1289,10 +1308,15 @@ async function botIfNeeded() {
 
 async function doMove(m) {
   if (!canAct()) return;
+  if (window.TUT && TUT.active() && !TUT.allowMove(m)) {
+    toast("🎓 Сейчас сделай подсвеченный ход — остальное потом");
+    return;
+  }
   mapSel = null;
   try {
     G = await post(`/api/room/${ROOM.id}/move`, { token: ROOM.token, move: m });
     renderAll();
+    if (window.TUT) TUT.onMoved();
     await botIfNeeded();
   } catch (e) {
     toast("Ход отклонён: " + e.message);
@@ -1415,6 +1439,19 @@ $("#lobby-hotseat").addEventListener("click", async () => {
   const resp = await post("/api/room/new", { mode: "hotseat" });
   setRoom(resp);
   hideLobby();
+});
+
+$("#lobby-tutorial").addEventListener("click", async () => {
+  let resp;
+  try {
+    resp = await post("/api/room/new", { mode: "tutorial" });
+  } catch (e) {
+    toast("Не удалось создать обучение: " + e.message);
+    return;
+  }
+  setRoom(resp);
+  hideLobby();
+  if (window.TUT) TUT.start();
 });
 
 $("#start-pvp").addEventListener("click", async () => {

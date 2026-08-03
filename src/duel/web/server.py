@@ -439,11 +439,18 @@ def _seat_of(room: dict, token: str) -> int:
     raise HTTPException(403, "не твоя комната")
 
 
+# Туториал: фиксированный сид (раскладка выверена под сценарий рельсов в
+# static/tutorial.js) и детерминированный лёгкий соперник — партия воспроизводится
+# в точности, пока ученик идёт по подсказкам
+TUTORIAL_SEED = 10
+TUTORIAL_BOT_SEED = 7
+
+
 @app.post("/api/room/new")
 def room_new(body: NewRoom, request: Request) -> dict:
     _purge_rooms()
-    if body.mode not in ("bot", "pvp", "hotseat"):
-        raise HTTPException(400, "mode: bot | pvp | hotseat")
+    if body.mode not in ("bot", "pvp", "hotseat", "tutorial"):
+        raise HTTPException(400, "mode: bot | pvp | hotseat | tutorial")
     if len(ROOMS) >= MAX_ROOMS:
         raise HTTPException(503, "сервер переполнен, попробуй позже")
     ip = _client_ip(request)
@@ -462,7 +469,16 @@ def room_new(body: NewRoom, request: Request) -> dict:
     side = 1 if body.side == 1 else 0
     bot = bot_kind = bot_seat = None
     rules = None
-    if body.mode == "bot":
+    if body.mode == "tutorial":
+        from duel.ai.bots import GreedyBot
+
+        side = 0  # ученик всегда Братство: сценарий написан под эту сторону
+        bot_kind = "tutorial"
+        bot = GreedyBot(seed=TUTORIAL_BOT_SEED)
+        bot_seat = 1
+        seats = {side: token, bot_seat: "__bot__"}
+        body = body.model_copy(update={"seed": TUTORIAL_SEED, "promo": False})
+    elif body.mode == "bot":
         bot_kind = body.bot or "mcts"
         bot = _make_bot(bot_kind, seed=int(time.time()) % 100_000)
         bot_seat = 1 - side
@@ -547,7 +563,7 @@ def room_bot_step(rid: str, body: RoomToken) -> dict:
     room = _room(rid)
     seat = _seat_of(room, body.token)
     g: Game = room["game"]
-    if room["mode"] != "bot" or room["bot"] is None:
+    if room["mode"] not in ("bot", "tutorial") or room["bot"] is None:
         raise HTTPException(400, "в этой комнате нет бота")
     if g.winner is None and _actor(g) == room["bot_seat"]:
         if not _BOT_SLOTS.acquire(timeout=20):
