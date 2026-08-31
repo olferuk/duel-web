@@ -38,22 +38,31 @@ class Tableau:
     def available(self) -> list[int]:
         return [s.id for s in self.slots if self.is_available(s.id)]
 
-    def take(self, slot_id: int) -> Card:
+    def reveal_available(self) -> list[int]:
+        """Rulebook: end your turn by revealing any cards that are now available.
+
+        Returns the slots newly turned faceup — the caller needs them to hand
+        out DLC Allies Power tokens.
+        """
+        new = [sid for sid in self.available() if sid not in self.revealed]
+        self.revealed.update(new)
+        return new
+
+    def take(self, slot_id: int, reveal: bool = True) -> Card:
         if not self.is_available(slot_id):
             raise ValueError(f"slot {slot_id} is not available")
         self.taken.add(slot_id)
-        # Rulebook: end your turn by revealing any cards that are now available.
-        for sid in self.available():
-            self.revealed.add(sid)
+        if reveal:
+            self.reveal_available()
         return self.cards[slot_id]
 
-    def take_any(self, slot_id: int) -> Card:
+    def take_any(self, slot_id: int, reveal: bool = True) -> Card:
         """Take a revealed card even if covered (The Shire promo tile)."""
         if slot_id in self.taken or slot_id not in self.revealed:
             raise ValueError(f"slot {slot_id} is not visible")
         self.taken.add(slot_id)
-        for sid in self.available():
-            self.revealed.add(sid)
+        if reveal:
+            self.reveal_available()
         return self.cards[slot_id]
 
     @property

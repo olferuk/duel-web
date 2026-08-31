@@ -13,7 +13,10 @@ DEFAULT_WEIGHTS = {
     "regions": 1.0,  # board presence
     "material": 0.25,  # coins, skills, links, tokens
     "tempo": 0.15,  # units on board, forts
+    "allies": 0.0,  # DLC «Союзники»: жетоны Силы, рука, раскрытые, замки (0 = база как раньше)
 }
+# Вариант для партий с дополнением (E2): та же эвристика + терм союзников
+DLC_WEIGHTS = {**DEFAULT_WEIGHTS, "allies": 0.3}
 
 
 def _own_progress(game: Game, p: int) -> int:
@@ -44,6 +47,25 @@ def _tempo(game: Game, p: int) -> float:
     return min(units, 10) / 10 * 0.6 + min(forts, 3) / 3 * 0.4
 
 
+def _allies(game: Game, p: int) -> float:
+    """DLC: жетон Силы — валюта призыва, раскрытый союзник — запас exit-эффекта,
+    карта в руке — опция; замки (стопки/ориентиры/дороги) — давление на соперника."""
+    if not game.allies:
+        return 0.0
+    pl = game.players[p]
+    locks = (
+        sum(1 for o in game.locked_stacks.values() if o == p)
+        + sum(1 for o in game.locked_landmarks.values() if o == p)
+        + sum(1 for o in game.locked_edges.values() if o == p)
+    )
+    return (
+        min(pl.power, 4) / 4 * 0.45
+        + min(len(pl.ally_open), 3) / 3 * 0.3
+        + min(len(pl.ally_hand), 3) / 3 * 0.1
+        + min(locks, 3) / 3 * 0.15
+    )
+
+
 def evaluate(game: Game, p: int, weights: dict | None = None) -> float:
     if game.winner is not None:
         if game.winner == "draw":
@@ -66,6 +88,7 @@ def evaluate(game: Game, p: int, weights: dict | None = None) -> float:
         + w["regions"] * (sharp(mg) - sharp(og))
         + w["material"] * (_material(game, p) - _material(game, o))
         + w["tempo"] * (_tempo(game, p) - _tempo(game, o))
+        + w.get("allies", 0.0) * (_allies(game, p) - _allies(game, o))
         + 0.5 * (mine - theirs)
     )
     return max(-0.99, min(0.99, score / 3))

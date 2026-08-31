@@ -13,7 +13,23 @@ TILE_IDS = [lm.id for lm in LANDMARKS]  # 9
 TOKEN_IDS = [t.id for t in TOKENS]  # 18
 CARD_IDS = [c.id for c in CARDS]  # 69
 RACES6 = ["elves", "ents", "hobbits", "humans", "dwarves", "wizards"]
-EDGES_DIR = sorted((a, b) for a in REGION_KEYS for b in ADJ[a])  # 22 directed
+# Направленные рёбра ЗАМОРОЖЕНЫ списком, а не выводятся из ADJ: блок «move»
+# задаёт смещения всех блоков после него, и любое изменение графа поля сдвинуло
+# бы индексы у уже обученных политик. mordor<->rhovanion — фантомная дорога,
+# убранная из поля 2026-08-29; индексы остались, ходы по ним просто не бывают
+# легальными. Новое ребро на поле — добавлять В КОНЕЦ, не пересортировывать.
+EDGES_DIR: list[tuple[str, str]] = [
+    ("arnor", "enedwaith"), ("arnor", "lindon"), ("arnor", "rhovanion"),
+    ("enedwaith", "arnor"), ("enedwaith", "gondor"), ("enedwaith", "rhovanion"),
+    ("enedwaith", "rohan"), ("gondor", "enedwaith"), ("gondor", "mordor"),
+    ("gondor", "rohan"), ("lindon", "arnor"), ("mordor", "gondor"),
+    ("mordor", "rhovanion"), ("mordor", "rohan"), ("rhovanion", "arnor"),
+    ("rhovanion", "enedwaith"), ("rhovanion", "mordor"), ("rhovanion", "rohan"),
+    ("rohan", "enedwaith"), ("rohan", "gondor"), ("rohan", "mordor"),
+    ("rohan", "rhovanion"),
+]  # 22 directed
+assert all(b in ADJ[a] or {a, b} == {"mordor", "rhovanion"} for a, b in EDGES_DIR)
+assert all((a, b) in EDGES_DIR for a in REGION_KEYS for b in ADJ[a]), "новое ребро поля — допиши в EDGES_DIR"
 
 _OFFSETS: dict[str, int] = {}
 _SIZE = 0

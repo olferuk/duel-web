@@ -37,7 +37,9 @@ class PVNet(nn.Module):
     def infer(self, obs: np.ndarray):
         self.eval()
         dev = next(self.parameters()).device
-        t = torch.from_numpy(obs).to(dev)
+        # фичи кодировки append-only: старые сети получают префикс вектора
+        in_size = self.trunk[0].in_features
+        t = torch.from_numpy(obs[..., :in_size]).to(dev)
         v, logits = self(t)
         return v.cpu().numpy(), logits.cpu().numpy()
 

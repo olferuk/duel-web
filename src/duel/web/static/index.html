@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Дуэль за Средиземье — прототип</title>
-<link rel="stylesheet" href="/static/style.css?v=57">
+<link rel="stylesheet" href="/static/style.css?v=63">
 </head>
 <body>
 
@@ -42,10 +42,12 @@
         </select>
       </label>
       <label class="chk"><input type="checkbox" id="promo" autocomplete="off"> Промо-тайлы</label>
+      <label class="chk"><input type="checkbox" id="bot-allies" autocomplete="off"> Дополнение «Союзники»</label>
+      <small class="chk-note" id="bot-allies-note">герои играют с союзниками, автомы — только базу</small>
       <label class="chk"><input type="checkbox" id="cb-bot"> Режим для дальтоников</label>
       <div class="lobby-btns">
-        <button class="btn" id="start-bot">Начать партию</button>
         <button class="btn ghost" data-back>← Назад</button>
+        <button class="btn" id="start-bot">Начать партию</button>
       </div>
     </div>
 
@@ -58,10 +60,21 @@
         </select>
       </label>
       <label class="chk"><input type="checkbox" id="pvp-promo" autocomplete="off"> Промо-тайлы</label>
+      <label class="chk"><input type="checkbox" id="pvp-allies" autocomplete="off"> Дополнение «Союзники»</label>
       <label class="chk"><input type="checkbox" id="cb-pvp"> Режим для дальтоников</label>
       <div class="lobby-btns">
-        <button class="btn" id="start-pvp">Создать комнату</button>
         <button class="btn ghost" data-back>← Назад</button>
+        <button class="btn" id="start-pvp">Создать комнату</button>
+      </div>
+    </div>
+
+    <div class="lobby-section hidden" id="lobby-hotseat-opts">
+      <p class="lobby-sub">Оба игрока ходят по очереди на одном экране.</p>
+      <label class="chk"><input type="checkbox" id="hs-promo" autocomplete="off"> Промо-тайлы</label>
+      <label class="chk"><input type="checkbox" id="hs-allies" autocomplete="off"> Дополнение «Союзники»</label>
+      <div class="lobby-btns">
+        <button class="btn ghost" data-back>← Назад</button>
+        <button class="btn" id="start-hotseat">Начать партию</button>
       </div>
     </div>
 
@@ -219,6 +232,6 @@
 
 </div>
 <script src="/static/tutorial.js?v=2"></script>
-<script src="/static/app.js?v=52"></script>
+<script src="/static/app.js?v=61"></script>
 </body>
 </html>

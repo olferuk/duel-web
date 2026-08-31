@@ -20,6 +20,9 @@ from dataclasses import dataclass, field
 from itertools import product
 
 from duel.engine.alliances import BY_ID as TOKEN_BY_ID
+from duel.engine.allies import BY_ID as ALLY_BY_ID
+from duel.engine.allies import BY_SIDE as ALLY_BY_SIDE
+from duel.engine.allies import ally_to_dict
 from duel.engine.board import EDGES, REGIONS
 from duel.engine.cards import Card, CardType, card_to_dict
 from duel.engine.landmarks import BY_ID as LM_BY_ID
@@ -33,6 +36,22 @@ ADJ: dict[str, set[str]] = {k: set() for k in REGION_KEYS}
 for _a, _b in EDGES:
     ADJ[_a].add(_b)
     ADJ[_b].add(_a)
+
+def _edge_key(a: str, b: str) -> str:
+    """Ключ связи регионов — упорядоченная пара, чтобы пережить JSON."""
+    return "|".join(sorted((a, b)))
+
+
+def move_key(m: dict) -> tuple:
+    """Хэшируемый ключ хода без подписи: значения-списки/словари — через repr."""
+    return tuple(
+        sorted(
+            (k, v if isinstance(v, (int, float, str, bool, type(None))) else repr(v))
+            for k, v in m.items()
+            if k != "label"
+        )
+    )
+
 
 FELLOWSHIP, SAURON = 0, 1
 SIDE_RU = ["Братство", "Саурон"]
@@ -62,6 +81,11 @@ class Player:
     tokens: list[str] = field(default_factory=list)
     landmarks: list[str] = field(default_factory=list)
     used_three_diff: bool = False
+    # DLC Allies: жетоны Силы и карты союзников (пусто вне режима)
+    power: int = 0
+    ally_hand: list[str] = field(default_factory=list)
+    ally_open: list[str] = field(default_factory=list)
+    ally_gone: list[str] = field(default_factory=list)
     _agg: dict | None = field(default=None, repr=False, compare=False)
 
     def _aggregates(self) -> dict:
@@ -186,15 +210,34 @@ DEFAULT_RULES = {
     # сбрасывает карты ради монет, а ориентиры покупает за 7/5/2 монеты
     # (+1 за каждую свою крепость). "powers" — силы персонажа (automa.py).
     "automa": None,
+    # DLC Allies (what-if рычаги; сам режим включается флагом Game(allies=True))
+    "allies_pool": 7,  # карт союзников на фракцию
+    "allies_hand": 3,  # сколько из них берётся в руку
+    "power_start": 1,  # жетонов Силы игроку на старте
+    "power_per_chapter": 2,  # жетонов на пирамиду при подготовке главы
 }
 
 # базовая цена ориентира для автомы по эпохам (соло-вариант, стр. 2)
 AUTOMA_TILE_BASE = (7, 5, 2)
 
+# DLC Allies: куда ложатся жетоны Силы при подготовке главы (диаграммы стр. 6).
+# Заданы как (row, x), а не id слота, чтобы пережить правку layout.py.
+# Во всех трёх главах — на ЗАКРЫТЫХ картах, симметрично на x = ∓2.
+POWER_POSITIONS: dict[int, tuple[tuple[int, int], ...]] = {
+    1: ((1, -2), (1, 2)),
+    2: ((1, -2), (1, 2)),
+    3: ((3, -2), (3, 2)),
+}
+POWER_TOKENS_TOTAL = 8
+
 
 class Game:
     def __init__(
-        self, seed: int | None = None, promo: bool = False, rules: dict | None = None
+        self,
+        seed: int | None = None,
+        promo: bool = False,
+        rules: dict | None = None,
+        allies: bool = False,
     ) -> None:
         self.rules = {**DEFAULT_RULES, **(rules or {})}
         self.rng = random.Random(seed)
@@ -234,11 +277,129 @@ class Game:
         self.winner: int | str | None = None  # 0 | 1 | "draw"
         self.win_reason: str | None = None
         self.promo = promo
+        # ---- DLC Allies ----
+        self.allies = allies
+        start = self.rules["power_start"] if allies else 0
+        self.power_supply = POWER_TOKENS_TOTAL - 2 * start if allies else 0
+        for pl in self.players:
+            pl.power = start
+        self.power_slots: set[int] = set()
+        # жетоны, окончательно выбывшие из игры (снятые с назгула, снятые
+        # с ориентира при его покупке владельцем) — только для инварианта «всего 8»
+        self.power_retired = 0
+        self.ally_called = False
+        self.ally_offered = False  # предложение призыва в этом ходу уже показывали
+        # сколько жетонов Силы игрок получил ИМЕННО в этом ходу: только это
+        # открывает призыв, который не был доступен до действия (см. _settle)
+        self.power_gained_turn = [0, 0]
+        self.turn_action_done = False
+        # Том Бомбадил: жетоны, мешающие игроку двигаться по треку Кольца.
+        # Индекс — тот, КОМУ мешают: обычно это Саурон (карта Братства), но
+        # exit-эффект, применённый варгом в свою пользу, инвертирует роли.
+        self.quest_locks = [0, 0]
+        self.locked_stacks: dict[str, int] = {}
+        self.locked_landmarks: dict[str, int] = {}
+        self.locked_edges: dict[str, int] = {}
+        # История применённых ходов (ключи без label) — кортеж, чтобы клоны
+        # делили его бесплатно; нужна поиску для переноса дерева между ходами
+        self.history: tuple = ()
+        self.forced_take: dict | None = None
+        if allies:
+            self._deal_allies()
+            self._place_power_tokens()
         # режим партии — первой строкой лога: «а стояла ли галочка промо?»
         # должно быть видно и через час после старта
-        self.log: list[str] = [
-            "Партия началась. Ходит Саурон." + (" Промо-тайлы: вкл." if promo else "")
-        ]
+        modes = ("Промо-тайлы: вкл." if promo else "") + (
+            " Дополнение «Союзники»: вкл." if allies else ""
+        )
+        self.log: list[str] = [("Партия началась. Ходит Саурон. " + modes).rstrip()]
+
+    # ---------- DLC Allies: setup ----------
+
+    def _deal_allies(self) -> None:
+        """Каждому — `allies_hand` случайных карт из `allies_pool` своей фракции.
+
+        Остальные уходят вне игры не глядя: их id нигде не сохраняются, поэтому
+        соперник (и поиск ботов) знает только состав колоды фракции.
+
+        Режим `allies_ban_stable` (SP-2, стратифицированная абляция): бан не
+        фильтрует колоду ДО тасовки (иначе сдвигается весь RNG партии), а
+        заменяет забанённую карту в руке следующей незабанённой из остатка.
+        Партии, где банённая карта не пришла в руку, побитово совпадают с
+        бейзлайном — их можно не переигрывать.
+        """
+        ban = set(self.rules.get("allies_ban") or ())
+        stable = bool(self.rules.get("allies_ban_stable"))
+        for p in (FELLOWSHIP, SAURON):
+            pool = self._ally_pool(p, keep_ban=stable)
+            self.rng.shuffle(pool)
+            hand = pool[: self.rules["allies_hand"]]
+            if stable and ban:
+                rest = [a for a in pool[self.rules["allies_hand"]:] if a not in ban]
+                hand = [a if a not in ban else (rest.pop(0) if rest else None) for a in hand]
+                hand = [a for a in hand if a is not None]
+            self.players[p].ally_hand = hand
+
+    def _ally_pool(self, p: int, keep_ban: bool = False) -> list[str]:
+        """Колода фракции с учётом what-if правила `allies_ban` (абляция карт).
+
+        keep_ban=True — не выбрасывать бан до тасовки (режим allies_ban_stable,
+        замена происходит после раздачи в _deal_allies)."""
+        ban = set() if keep_ban else set(self.rules.get("allies_ban") or ())
+        return [a for a in list(ALLY_BY_SIDE[p])[: self.rules["allies_pool"]] if a not in ban]
+
+    def _place_power_tokens(self) -> None:
+        """Разложить жетоны Силы на карты пирамиды текущей главы.
+
+        Позиции берутся по (row, x): при нестандартной раскладке отсутствующая
+        позиция просто пропускается (решение раздела 8 спеки).
+        """
+        self.power_slots = set()
+        if not self.allies:
+            return
+        want = self.rules["power_per_chapter"]
+        by_pos = {(s.row, s.x): s.id for s in self.tableau.slots}
+        for row, x in POWER_POSITIONS.get(self.chapter, ())[:want]:
+            sid = by_pos.get((row, x))
+            if sid is None or self.power_supply <= 0:
+                continue
+            self.power_slots.add(sid)
+            self.power_supply -= 1
+
+    def _award_power(self, p: int, revealed: list[int]) -> None:
+        """Отдать игроку жетоны Силы со свежевскрытых карт."""
+        if not self.allies or not self.power_slots:
+            return
+        got = self.power_slots & set(revealed)
+        for sid in got:
+            self.power_slots.discard(sid)
+            self.players[p].power += 1
+            self.power_gained_turn[p] += 1
+        if got:
+            self.log.append(f"{SIDE_RU[p]}: +{len(got)} жетон(ов) Силы с вскрытой карты")
+
+    def _reveal_tableau(self, p: int) -> None:
+        """Вскрыть ставшие доступными карты, начислив жетоны игроку `p`."""
+        self._award_power(p, self.tableau.reveal_available())
+
+    def _take_slot(self, p: int, slot_id: int, any_: bool = False, reveal: bool = True) -> Card:
+        """Взять карту пирамиды, начислив жетоны Силы за вскрытые карты.
+
+        Правило: «каждый раз, когда вы должны раскрыть карту с жетоном, сначала
+        заберите жетон, потом переверните карту» — жетон получает тот, чьё
+        действие вызвало раскрытие. `Tableau.take` игрока не знает, поэтому
+        начисление живёт здесь.
+
+        `reveal=False` — сброс без вскрытия (enter-эффект Фарамира): карты
+        снизу освобождаются, но остаются закрытыми до конца хода.
+        """
+        if any_:
+            card = self.tableau.take_any(slot_id, reveal=False)
+        else:
+            card = self.tableau.take(slot_id, reveal=False)
+        if reveal:
+            self._reveal_tableau(p)
+        return card
 
     # ---------- fast copy for search ----------
 
@@ -258,6 +419,10 @@ class Game:
                 tokens=list(pl.tokens),
                 landmarks=list(pl.landmarks),
                 used_three_diff=pl.used_three_diff,
+                power=pl.power,
+                ally_hand=list(pl.ally_hand),
+                ally_open=list(pl.ally_open),
+                ally_gone=list(pl.ally_gone),
             )
             for pl in self.players
         ]
@@ -287,16 +452,34 @@ class Game:
         g.winner = self.winner
         g.win_reason = self.win_reason
         g.promo = self.promo
+        g.allies = self.allies
+        g.power_supply = self.power_supply
+        g.power_slots = set(self.power_slots)
+        g.power_retired = self.power_retired
+        g.ally_called = self.ally_called
+        g.ally_offered = self.ally_offered
+        g.power_gained_turn = list(self.power_gained_turn)
+        g.turn_action_done = self.turn_action_done
+        g.quest_locks = list(self.quest_locks)
+        g.locked_stacks = dict(self.locked_stacks)
+        g.locked_landmarks = dict(self.locked_landmarks)
+        g.locked_edges = dict(self.locked_edges)
+        g.history = self.history
+        g.forced_take = dict(self.forced_take) if self.forced_take else None
         g.log = _NullLog()
         return g
 
-    def randomize_hidden(self, rng: random.Random) -> None:
+    def randomize_hidden(self, rng: random.Random, viewer: int | None = None) -> None:
         """Resample everything hidden from BOTH players — for honest search.
 
         Unknowns: identities of facedown unrevealed tableau cards and of the
         hidden discard (interchangeable pool), the order inside alliance
         stacks, and all future shuffles (via reseeding our RNG). Public info
         is untouched.
+
+        ``viewer`` — сторона, которая ведёт поиск: её собственная рука союзников
+        ей известна и НЕ пересэмплируется (иначе легальные ходы призыва в мире
+        расходятся с реальными, и голоса миров ложатся не на те ходы).
         """
         tab = self.tableau
         hidden_slots = [
@@ -310,6 +493,17 @@ class Game:
         self.discard_hidden = pool
         for stack in self.alliance_stacks.values():
             rng.shuffle(stack)
+        if self.allies:
+            # Рука союзников: известен только состав колоды фракции и то, какие
+            # карты уже раскрыты или вышли. Пересэмплируем остаток.
+            for p in (FELLOWSHIP, SAURON):
+                if p == viewer:
+                    continue
+                pl = self.players[p]
+                seen = set(pl.ally_open) | set(pl.ally_gone)
+                rest = [a for a in self._ally_pool(p) if a not in seen]
+                rng.shuffle(rest)
+                pl.ally_hand = rest[: len(pl.ally_hand)]
         self.rng = random.Random(rng.getrandbits(64))
 
     # ---------- helpers ----------
@@ -378,6 +572,19 @@ class Game:
         if self.winner is not None or steps <= 0:
             return
         who = "frodo" if p == FELLOWSHIP else "nazgul"
+        if self.quest_locks[p]:
+            # Том Бомбадил: каждый жетон съедает одно продвижение, остаток идёт
+            # в движение (BGG: «still a two-ring card, but one advancement»)
+            spent = min(steps, self.quest_locks[p])
+            self.quest_locks[p] -= spent
+            self.power_retired += spent  # снятый жетон выбывает из игры
+            steps -= spent
+            self.log.append(
+                f"Том Бомбадил: {SIDE_RU[p]} снимает жетонов {spent},"
+                f" осталось {self.quest_locks[p]}"
+            )
+            if steps <= 0:
+                return
         bonuses = self.quest.advance(who, steps)
         self.log.append(f"{SIDE_RU[p]}: +{steps} по Пути Кольца (разрыв {self.quest.gap})")
         if self.quest.winner is not None:
@@ -465,6 +672,12 @@ class Game:
             return moves
         moves: list[dict] = []
         p = self.current
+        if self.forced_take is not None and self.forced_take["player"] == p:
+            if self.forced_take["slot"] in self.tableau.taken:
+                # навязанная карта исчезла до хода соперника — обязанность гаснет
+                self.forced_take = None
+            else:
+                return self._forced_moves()
         for sid in self.tableau.available():
             card = self.tableau.cards[sid]
             cost = self.card_cost(p, card)
@@ -487,6 +700,8 @@ class Game:
                     {"type": "discard", "slot": sid, "label": f"Сбросить (+{gain}🪙)", "gain": gain}
                 )
         for lm_id in self.landmarks_faceup:
+            if not self._landmark_open(lm_id, p):
+                continue  # заперт жетоном вождя урук-хай
             lm = LM_BY_ID[lm_id]
             cost = self.tile_cost(p, lm)
             if cost["coins"] <= self.players[p].coins:
@@ -498,6 +713,75 @@ class Game:
                         "cost": cost["coins"],
                     }
                 )
+        if not self.ally_called:
+            moves += self._ally_moves()
+        return moves
+
+    # ---------- DLC Allies: призыв ----------
+
+    def _ally_moves(self, p: int | None = None) -> list[dict]:
+        """Ходы призыва: enter из руки за 1 жетон, exit раскрытого за 2."""
+        if not self.allies:
+            return []
+        p = self.current if p is None else p
+        pl = self.players[p]
+        moves: list[dict] = []
+        if pl.power >= 1:
+            for aid in pl.ally_hand:
+                moves.append(
+                    {
+                        "type": "ally_enter",
+                        "ally": aid,
+                        "label": f"{ALLY_BY_ID[aid].name_ru}: призыв (1 жетон)",
+                    }
+                )
+        if pl.power >= 2:
+            for aid in pl.ally_open:
+                moves.append(
+                    {
+                        "type": "ally_exit",
+                        "ally": aid,
+                        "label": f"{ALLY_BY_ID[aid].name_ru}: прощание (2 жетона)",
+                    }
+                )
+        return moves
+
+    def _forced_moves(self) -> list[dict]:
+        """Грима: вместо своего хода соперник обязан взять указанную карту.
+
+        Обычный ход заменён целиком — ни ориентиров, ни призыва союзника
+        (призыв станет доступен сразу после исполнения, через ally_offer).
+        """
+        assert self.forced_take is not None
+        ft = self.forced_take
+        p = ft["player"]
+        sid = ft["slot"]
+        moves: list[dict] = []
+        card = self.tableau.cards[sid]
+        gain = self.rules["discard_payout"][self.chapter - 1] * (
+            2 if "humans_double_discard" in self.players[p].tokens else 1
+        )
+        if ft["mode"] == "play_or_discard":
+            cost = self.card_cost(p, card)
+            if cost["coins"] <= self.players[p].coins:
+                lbl = "по цепочке" if cost["chained"] else f"цена {cost['coins']}🪙"
+                moves.append(
+                    {
+                        "type": "play",
+                        "slot": sid,
+                        "label": f"Грима велит: сыграть ({lbl})",
+                        "cost": cost["coins"],
+                        "chained": cost["chained"],
+                    }
+                )
+        moves.append(
+            {
+                "type": "discard",
+                "slot": sid,
+                "label": f"Грима велит: сбросить (+{gain}🪙)",
+                "gain": gain,
+            }
+        )
         return moves
 
     def _pending_moves(self, pd: dict) -> list[dict]:
@@ -513,6 +797,8 @@ class Game:
             for src in REGION_KEYS:
                 if self.board_units[src][p] > 0:
                     for dst in sorted(ADJ[src]):
+                        if not self._edge_open(src, dst, p):
+                            continue  # связь перекрыта жетоном Балрога
                         moves.append(
                             {
                                 "type": "move",
@@ -558,7 +844,7 @@ class Game:
                 )
         elif t == "choose_race":
             for race in RACES:
-                if self.alliance_stacks[race]:
+                if self.alliance_stacks[race] and self._stack_open(race, p):
                     moves.append({"type": "pick_race", "race": race, "label": RACE_RU[race]})
         elif t == "play_from_discard":
             # сброс = ТОЛЬКО проданные карты; отложенные при сетапе — вне игры
@@ -618,6 +904,8 @@ class Game:
             for src in REGION_KEYS:
                 if self.board_units[src][p] > 0:
                     for dst in sorted(ADJ[src]):
+                        if not self._edge_open(src, dst, p):
+                            continue
                         moves.append(
                             {
                                 "type": "ents_move",
@@ -626,6 +914,110 @@ class Game:
                                 "label": f"Юнит: {REGION_RU[src]} → {REGION_RU[dst]}",
                             }
                         )
+        elif t == "ally_offer":
+            moves += self._ally_moves(p)
+        elif t == "kill_region_all":
+            opp = 1 - p
+            for r in REGION_KEYS:
+                if self.board_units[r][opp] > 0:
+                    moves.append(
+                        {
+                            "type": "kill_all",
+                            "region": r,
+                            "label": f"Убрать всех: {REGION_RU[r]} ({self.board_units[r][opp]})",
+                        }
+                    )
+        elif t == "arwen_chapter":
+            for ch in sorted({c.chapter for c in self.discard_open}):
+                moves.append({"type": "arwen_pick", "chapter": ch, "label": f"Глава {ch}"})
+        elif t == "elrond_race":
+            for race in pd["races"]:
+                if self.alliance_stacks[race] and self._stack_open(race, p):
+                    moves.append({"type": "pick_race", "race": race, "label": RACE_RU[race]})
+        elif t == "faramir_discard":
+            for sid in self.tableau.available():
+                moves.append(
+                    {
+                        "type": "faramir_pick",
+                        "slot": sid,
+                        "label": f"Сбросить: {self._slot_label(sid)}",
+                    }
+                )
+        elif t == "witch_king_choice":
+            moves.append({"type": "wk_quest", "label": "Назгул: 1 шаг по треку"})
+            for r in REGION_KEYS:
+                moves.append({"type": "wk_unit", "region": r, "label": f"Юнит → {REGION_RU[r]}"})
+        elif t == "lock_stack":
+            for race in RACES:
+                if race not in self.locked_stacks and self.alliance_stacks[race]:
+                    moves.append(
+                        {"type": "lock_race", "race": race, "label": f"Запереть: {RACE_RU[race]}"}
+                    )
+        elif t == "discard_opp_token":
+            for i, tok in enumerate(self.players[1 - p].tokens):
+                moves.append(
+                    {
+                        "type": "drop_token",
+                        "index": i,
+                        "label": f"Снять жетон: {TOKEN_BY_ID[tok].text_ru}",
+                    }
+                )
+        elif t == "lock_landmark":
+            for lm_id in self.landmarks_faceup:
+                if lm_id not in self.locked_landmarks:
+                    moves.append(
+                        {
+                            "type": "lock_tile",
+                            "tile": lm_id,
+                            "label": f"Запереть: {LM_BY_ID[lm_id].name_ru}",
+                        }
+                    )
+        elif t == "take_landmark_free":
+            for lm_id in self.landmarks_faceup:
+                if self._landmark_open(lm_id, p):
+                    moves.append(
+                        {
+                            "type": "free_tile",
+                            "tile": lm_id,
+                            "label": f"{LM_BY_ID[lm_id].name_ru} (бесплатно)",
+                        }
+                    )
+        elif t == "lock_edge":
+            for a, b in EDGES:
+                key = _edge_key(a, b)
+                if key not in self.locked_edges:
+                    moves.append(
+                        {
+                            "type": "lock_link",
+                            "edge": key,
+                            "label": f"Перекрыть: {REGION_RU[a]} ↔ {REGION_RU[b]}",
+                        }
+                    )
+        elif t == "choose_opp_ally":
+            for aid in self.players[1 - p].ally_open:
+                moves.append(
+                    {
+                        "type": "steal_exit",
+                        "ally": aid,
+                        "label": f"Прощание {ALLY_BY_ID[aid].name_ru} — в свою пользу",
+                    }
+                )
+        elif t == "steal_opp_grey":
+            opp = 1 - p
+            for i, c in enumerate(self.players[opp].played):
+                if c.type is CardType.GREY:
+                    moves.append(
+                        {"type": "grab_grey", "index": i, "label": f"Забрать: {card_label(c)}"}
+                    )
+        elif t == "grima_pick":
+            for sid in self.tableau.available():
+                moves.append(
+                    {
+                        "type": "grima_target",
+                        "slot": sid,
+                        "label": f"Навязать: {self._slot_label(sid)}",
+                    }
+                )
         if pd.get("optional") or t in ("movements", "casualties", "ents_menu"):
             moves.append({"type": "skip", "label": "Пропустить"})
         if not moves:
@@ -637,12 +1029,17 @@ class Game:
     def apply(self, move: dict) -> None:
         if self.winner is not None:
             raise ValueError("game over")
+        self.history = self.history + (move_key(move),)
         p = self.current
         t = move["type"]
         if self.pending:
             self._apply_pending(move)
+        elif t in ("ally_enter", "ally_exit"):
+            self._ally_call(p, move)
         elif t == "play":
-            card = self.tableau.take(move["slot"])
+            self.forced_take = None
+            self.turn_action_done = True
+            card = self._take_slot(p, move["slot"])
             cost = self.card_cost(p, card)
             self._pay_coins(p, cost["coins"])
             self.players[p].add_card(card)
@@ -662,7 +1059,9 @@ class Game:
                 self.log.append(f"Хоббиты: +{got}🪙 за цепочку")
             self._card_effects(p, card)
         elif t == "discard":
-            card = self.tableau.take(move["slot"])
+            self.forced_take = None
+            self.turn_action_done = True
+            card = self._take_slot(p, move["slot"])
             self.discard_open.append(card)
             mult = 2 if "humans_double_discard" in self.players[p].tokens else 1
             got = self._gain_coins(p, self.rules["discard_payout"][self.chapter - 1] * mult)
@@ -671,10 +1070,13 @@ class Game:
             self.last_action[p] = msg
             self.turn_no += 1
         elif t == "tile":
+            self.turn_action_done = True
             lm = LM_BY_ID[move["tile"]]
             cost = self.tile_cost(p, lm)
             self._pay_coins(p, cost["coins"])
             self.landmarks_faceup.remove(lm.id)
+            if self.locked_landmarks.pop(lm.id, None) is not None:
+                self.power_retired += 1  # владелец забрал свой же запертый ориентир
             self.players[p].landmarks.append(lm.id)
             msg = f"Ход {self.turn_no} — {SIDE_RU[p]} возводит {lm.name_ru} за {cost['coins']}🪙"
             self.log.append(msg)
@@ -700,6 +1102,34 @@ class Game:
             self.pending.clear()
             self.extra_offers.clear()
             return
+        if self.allies and not self.turn_action_done:
+            # был только призыв союзника — обычное действие ещё впереди,
+            # ход не заканчиваем и ничего больше не спрашиваем
+            if self.legal_moves():
+                return
+            # Призыв съел последнюю возможность (Фарамир сбросил единственную
+            # доступную карту без вскрытия, монет на ориентир нет, жетонов нет):
+            # состояние без единого хода ломает поиск — ход просто переходит.
+            self.log.append(f"{SIDE_RU[self.current]}: после призыва ходов нет — ход переходит")
+            self.turn_action_done = True
+        if (
+            self.allies
+            and not self.ally_called
+            and not self.ally_offered
+            and self.power_gained_turn[self.current]
+            and self._ally_moves()
+        ):
+            # Второе окно призыва: «в любой момент хода, даже после того, как
+            # вскрылись новые карты». Спрашиваем ТОЛЬКО если игрок получил жетон
+            # именно в этом ходу — иначе тот же призыв был доступен ему и до
+            # действия, и вопрос вырождается в лишний клик каждый ход.
+            # Спрашиваем до _end_turn, поэтому призыв успевает до раскладки
+            # следующей главы — этим обеспечен тайминг на стыке глав.
+            self.ally_offered = True
+            self.pending.append(
+                {"type": "ally_offer", "player": self.current, "optional": True}
+            )
+            return
         if self.extra_offers:
             # все эффекты хода отыграны — теперь спрашиваем про дополнительный ход
             self.pending.append(
@@ -713,6 +1143,9 @@ class Game:
         self._end_turn()
 
     def _end_turn(self) -> None:
+        # карты, освобождённые без вскрытия (enter Фарамира), вскрываются
+        # в конце хода — жетон Силы достаётся тому, чей ход закончился
+        self._reveal_tableau(self.current)
         if self.tableau.empty:
             if self.chapter == 3:
                 self._final_scoring()
@@ -720,9 +1153,14 @@ class Game:
             self.chapter += 1
             self.tableau = Tableau(self.chapter, seed=self.rng.randrange(1 << 30))
             self.discard_hidden.extend(self.tableau.discarded)
+            self._place_power_tokens()
             while len(self.landmarks_faceup) < 3 and self.landmarks_deck:
                 self.landmarks_faceup.append(self.landmarks_deck.pop())
             self.log.append(f"— Эпоха {self.chapter} —")
+        self.turn_action_done = False
+        self.ally_called = False
+        self.ally_offered = False
+        self.power_gained_turn = [0, 0]
         if self.extra_turns > 0:
             self.extra_turns -= 1
             self.log.append(f"{SIDE_RU[self.current]} ходит ещё раз")
@@ -807,7 +1245,7 @@ class Game:
             self.pending.append({"type": "movements", "player": p, "n": 2})
         race = card.race
         assert race is not None
-        if counts.get(race, 0) == 2 and self.alliance_stacks[race]:
+        if counts.get(race, 0) == 2 and self.alliance_stacks[race] and self._stack_open(race, p):
             top2 = self.alliance_stacks[race][:2]
             self.pending.append(
                 {
@@ -823,7 +1261,8 @@ class Game:
             options = []
             races3 = sorted(counts, key=lambda r: -counts[r])[:3]
             for r in races3:
-                if self.alliance_stacks[r]:
+                # Шелоб: запертая стопка не даёт сопернику ни брать, ни смотреть
+                if self.alliance_stacks[r] and self._stack_open(r, p):
                     options.append(self.alliance_stacks[r][0])
             if options:
                 self.pending.append(
@@ -864,6 +1303,176 @@ class Game:
             self.pending.append({"type": "shire_play", "player": p, "optional": True})
         elif lm.effect == "grond_assault":
             self.pending.append({"type": "grond_pick", "player": p, "optional": True})
+
+    # ---------- DLC Allies: эффекты союзников ----------
+
+    def _ally_call(self, p: int, move: dict) -> None:
+        aid = move["ally"]
+        ally = ALLY_BY_ID[aid]
+        pl = self.players[p]
+        enter = move["type"] == "ally_enter"
+        cost = 1 if enter else 2
+        assert pl.power >= cost
+        pl.power -= cost
+        # потраченные жетоны возвращаются в общий запас; карты, кладущие жетон
+        # на поле, забирают его обратно через _put_token_on_board()
+        self.power_supply += cost
+        if enter:
+            pl.ally_hand.remove(aid)
+            pl.ally_open.append(aid)
+            self.log.append(f"{SIDE_RU[p]} призывает союзника: {ally.name_ru}")
+        else:
+            pl.ally_open.remove(aid)
+            pl.ally_gone.append(aid)
+            self.log.append(f"{SIDE_RU[p]} прощается с союзником: {ally.name_ru}")
+        self.ally_called = True
+        self._ally_effect(p, aid, "enter" if enter else "exit")
+
+    def _slot_label(self, sid: int) -> str:
+        """Подпись карты раскладки для меню выбора: «слот 12» игроку ничего не говорит."""
+        if sid in self.tableau.revealed:
+            return card_label(self.tableau.cards[sid])
+        return f"закрытая карта (слот {sid})"
+
+    def _stack_open(self, race: str, p: int) -> bool:
+        """Доступна ли стопка Альянса игроку `p` (Шелоб запирает её сопернику)."""
+        owner = self.locked_stacks.get(race)
+        return owner is None or owner == p
+
+    def _landmark_open(self, lm_id: str, p: int) -> bool:
+        """Доступен ли ориентир игроку `p` (вождь урук-хай запирает сопернику)."""
+        owner = self.locked_landmarks.get(lm_id)
+        return owner is None or owner == p
+
+    def _edge_open(self, a: str, b: str, p: int) -> bool:
+        """Можно ли игроку `p` двигаться по связи (Балрог перекрывает сопернику)."""
+        owner = self.locked_edges.get(_edge_key(a, b))
+        return owner is None or owner == p
+
+    def _put_token_on_board(self, n: int = 1) -> None:
+        """Жетон лёг на поле (назгул, стопка, ориентир, связь) — он выбывает."""
+        self.power_supply -= n
+
+    def _lose_coins(self, p: int, n: int) -> int:
+        lost = min(n, self.players[p].coins)
+        self.players[p].coins -= lost
+        self.reserve += lost
+        return lost
+
+    def _q(self, pd: dict) -> None:
+        """Поставить pending с пометкой, что он от союзника (для UI и логов)."""
+        pd.setdefault("optional", True)  # П2: эффект можно применить частично
+        pd.setdefault("ally", True)
+        self.pending.append(pd)
+
+    def _ally_effect(self, p: int, aid: str, phase: str) -> None:
+        """Эффекты всех 14 карт. `p` — тот, В ЧЬЮ ПОЛЬЗУ применяется эффект.
+
+        Для exit-эффекта варга `p` — призвавший варга игрок, а не владелец
+        карты: роли инвертируются полностью (решение 10 раздела 8 спеки).
+        """
+        opp = 1 - p
+        enter = phase == "enter"
+
+        # ---- Братство ----
+        if aid == "tom_bombadil":
+            n = 1 if enter else 2
+            self.quest_locks[opp] += n
+            self._put_token_on_board(n)
+            self.log.append(
+                f"Том Бомбадил: {SIDE_RU[opp]} должен снять {self.quest_locks[opp]}"
+                " жетон(ов), прежде чем двигаться по треку"
+            )
+        elif aid == "goldberry":
+            got = self._gain_coins(p, 3 if enter else 5)
+            self.log.append(f"Златеника: +{got}🪙")
+            if not enter:
+                lost = self._lose_coins(opp, 2)
+                if lost:
+                    self.log.append(f"Златеника: {SIDE_RU[opp]} теряет {lost}🪙")
+        elif aid == "boromir":
+            self._q({"type": "casualties" if enter else "kill_region_all", "player": p, "n": 1})
+        elif aid == "arwen":
+            if enter:
+                self._q({"type": "arwen_chapter", "player": p})
+            else:
+                self._q({"type": "play_from_discard", "player": p})
+        elif aid == "elrond":
+            races = (
+                ["dwarves", "humans", "elves", "hobbits"] if enter else ["wizards", "ents"]
+            )
+            self._q({"type": "elrond_race", "player": p, "races": races})
+        elif aid == "faramir":
+            # enter НЕ вскрывает освободившиеся карты (решение 13), exit — вскрывает
+            self._q({"type": "faramir_discard", "player": p, "reveal": not enter})
+            if not enter:
+                self._q({"type": "faramir_discard", "player": p, "reveal": True})
+        elif aid == "lobelia":
+            n = 1 if enter else 2
+            for _ in range(n):
+                self._q(
+                    {
+                        "type": "place_units",
+                        "player": p,
+                        "n": 1,
+                        "regions": list(REGION_KEYS),
+                        "why": "Лобелия",
+                    }
+                )
+            self._q({"type": "movements", "player": p, "n": n})
+
+        # ---- Саурон ----
+        elif aid == "witch_king":
+            if enter:
+                self._q({"type": "witch_king_choice", "player": p})
+            else:
+                self._advance_quest(p, 1)
+                if self.winner is None:
+                    self._q(
+                        {
+                            "type": "place_units",
+                            "player": p,
+                            "n": 1,
+                            "regions": list(REGION_KEYS),
+                            "why": "Король-чародей",
+                        }
+                    )
+        elif aid == "shelob":
+            if enter:
+                self._q({"type": "lock_stack", "player": p})
+            else:
+                self._q({"type": "discard_opp_token", "player": p})
+        elif aid == "uruk_hai_chief":
+            self._q({"type": "lock_landmark" if enter else "take_landmark_free", "player": p})
+        elif aid == "balrog":
+            self._q({"type": "lock_edge", "player": p, "kill": not enter})
+        elif aid == "warg":
+            if enter:
+                hand = self.players[opp].ally_hand
+                if hand:
+                    victim = self.rng.choice(hand)
+                    hand.remove(victim)
+                    self.players[opp].ally_open.append(victim)
+                    self.log.append(
+                        f"Варг: у {SIDE_RU[opp]} раскрыт {ALLY_BY_ID[victim].name_ru}"
+                        " — enter-эффект потерян"
+                    )
+                else:
+                    self.log.append("Варг: у соперника нет нераскрытых союзников")
+            else:
+                self._q({"type": "choose_opp_ally", "player": p})
+        elif aid == "cave_troll":
+            self._q(
+                {"type": "discard_opp_grey" if enter else "steal_opp_grey", "player": p}
+            )
+        elif aid == "grima":
+            self._q(
+                {
+                    "type": "grima_pick",
+                    "player": p,
+                    "mode": "play_or_discard" if enter else "discard",
+                }
+            )
 
     # ---------- token effects ----------
 
@@ -924,7 +1533,101 @@ class Game:
         if t == "skip":
             self.pending.pop(0)
             return
-        if pd["type"] == "extra_turn_offer":
+        if pd["type"] == "ally_offer":
+            self.pending.pop(0)
+            self._ally_call(p, move)
+        elif pd["type"] == "kill_region_all":
+            self.pending.pop(0)
+            r = move["region"]
+            n = self.board_units[r][1 - p]
+            self.board_units[r][1 - p] = 0
+            self.log.append(f"Боромир: {SIDE_RU[1 - p]} теряет {n} юнит(ов) в {REGION_RU[r]}")
+            self._check_conquer()
+        elif pd["type"] == "arwen_chapter":
+            self.pending.pop(0)
+            pool = [i for i, c in enumerate(self.discard_open) if c.chapter == move["chapter"]]
+            idx = self.rng.choice(pool)
+            card = self.discard_open.pop(idx)
+            self.players[p].add_card(card)
+            self.log.append(f"Арвен: наугад из сброса — {card_label(card)} (бесплатно)")
+            self._card_effects(p, card)
+        elif pd["type"] == "elrond_race":
+            self.pending.pop(0)
+            race = move["race"]
+            tok = self.alliance_stacks[race].pop(0)
+            self.log.append(f"Элронд: верхний жетон расы {RACE_RU[race]}")
+            self._gain_token(p, tok)
+        elif pd["type"] == "faramir_discard":
+            self.pending.pop(0)
+            card = self._take_slot(p, move["slot"], reveal=pd.get("reveal", True))
+            self.discard_open.append(card)
+            # монет за этот сброс НЕ даётся (примечание правил)
+            self.log.append(f"Фарамир: сброшена карта из центра — {card_label(card)}")
+        elif pd["type"] == "witch_king_choice":
+            self.pending.pop(0)
+            if t == "wk_quest":
+                self._advance_quest(p, 1)
+            else:
+                self._place_units(p, move["region"], 1)
+        elif pd["type"] == "lock_stack":
+            self.pending.pop(0)
+            race = move["race"]
+            self.locked_stacks[race] = p
+            self._put_token_on_board()
+            self.log.append(f"Шелоб: стопка {RACE_RU[race]} закрыта для {SIDE_RU[1 - p]}")
+        elif pd["type"] == "discard_opp_token":
+            self.pending.pop(0)
+            tok = self.players[1 - p].tokens.pop(move["index"])
+            self.log.append(f"Шелоб: у {SIDE_RU[1 - p]} снят жетон {TOKEN_BY_ID[tok].text_ru}")
+        elif pd["type"] == "lock_landmark":
+            self.pending.pop(0)
+            self.locked_landmarks[move["tile"]] = p
+            self._put_token_on_board()
+            self.log.append(
+                f"Вождь урук-хай: {LM_BY_ID[move['tile']].name_ru} закрыт для {SIDE_RU[1 - p]}"
+            )
+        elif pd["type"] == "take_landmark_free":
+            self.pending.pop(0)
+            lm = LM_BY_ID[move["tile"]]
+            self.landmarks_faceup.remove(lm.id)
+            if self.locked_landmarks.pop(lm.id, None) is not None:
+                self.power_retired += 1  # владелец забрал свой же запертый ориентир
+            self.players[p].landmarks.append(lm.id)
+            self.log.append(f"Вождь урук-хай: {SIDE_RU[p]} возводит {lm.name_ru} бесплатно")
+            self._tile_effects(p, lm)
+        elif pd["type"] == "lock_edge":
+            self.pending.pop(0)
+            key = move["edge"]
+            self.locked_edges[key] = p
+            self._put_token_on_board()
+            a, b = key.split("|")
+            self.log.append(
+                f"Балрог: связь {REGION_RU[a]} ↔ {REGION_RU[b]} закрыта для {SIDE_RU[1 - p]}"
+            )
+            if pd.get("kill"):
+                for r in (a, b):
+                    if self.board_units[r][1 - p] > 0:
+                        self.board_units[r][1 - p] -= 1
+                        self.log.append(f"Балрог: {SIDE_RU[1 - p]} теряет юнита в {REGION_RU[r]}")
+                self._check_conquer()
+        elif pd["type"] == "choose_opp_ally":
+            self.pending.pop(0)
+            aid = move["ally"]
+            self.log.append(
+                f"Варг: {SIDE_RU[p]} применяет прощание {ALLY_BY_ID[aid].name_ru} в свою пользу"
+            )
+            self._ally_effect(p, aid, "exit")
+        elif pd["type"] == "steal_opp_grey":
+            self.pending.pop(0)
+            card = self.players[1 - p].remove_card(move["index"])
+            self.players[p].add_card(card)
+            self.log.append(f"Пещерный тролль: {SIDE_RU[p]} забирает {card_label(card)}")
+            self._check_races(p)
+        elif pd["type"] == "grima_pick":
+            self.pending.pop(0)
+            self.forced_take = {"player": 1 - p, "slot": move["slot"], "mode": pd["mode"]}
+            self.log.append(f"Грима навязывает {SIDE_RU[1 - p]} карту из центра")
+        elif pd["type"] == "extra_turn_offer":
             self.pending.pop(0)
             if move.get("take"):
                 self.extra_turns += 1
@@ -997,7 +1700,7 @@ class Game:
             self.log.append(f"Изенгард: у {SIDE_RU[1 - p]} снята {card_label(card)}")
         elif pd["type"] == "shire_play":
             self.pending.pop(0)
-            card = self.tableau.take_any(move["slot"])
+            card = self._take_slot(p, move["slot"], any_=True)
             cost = self.card_cost(p, card)
             self._pay_coins(p, cost["coins"])
             self.players[p].add_card(card)
@@ -1077,6 +1780,16 @@ class Game:
             "chapter": self.chapter,
             "current": self.current,
             "promo": self.promo,
+            "allies": self.allies,
+            "power_slots": sorted(self.power_slots),
+            "power_supply": self.power_supply,
+            "power_retired": self.power_retired,
+            "quest_locks": list(self.quest_locks),
+            "locked_stacks": dict(self.locked_stacks),
+            "locked_landmarks": dict(self.locked_landmarks),
+            "locked_edges": dict(self.locked_edges),
+            "ally_called": self.ally_called,
+            "forced_take": self.forced_take,
             "turn_no": self.turn_no,
             "winner": self.winner,
             "win_reason": self.win_reason,
@@ -1101,6 +1814,13 @@ class Game:
                     "presence": self.presence_count(i),
                     "supply": self.supply(i),
                     "last_action": self.last_action[i],
+                    # DLC Allies. ally_hand — скрытая информация: веб-слой
+                    # вырезает чужую руку в _payload() по посадочному месту.
+                    "power": pl.power,
+                    "ally_hand": [ally_to_dict(ALLY_BY_ID[a]) for a in pl.ally_hand],
+                    "ally_hand_count": len(pl.ally_hand),
+                    "ally_open": [ally_to_dict(ALLY_BY_ID[a]) for a in pl.ally_open],
+                    "ally_gone": [ally_to_dict(ALLY_BY_ID[a]) for a in pl.ally_gone],
                 }
                 for i, pl in enumerate(self.players)
             ],

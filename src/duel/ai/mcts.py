@@ -13,7 +13,7 @@ import random
 
 from duel.ai.bots import Bot
 from duel.ai.heuristic import evaluate
-from duel.engine.game import Game
+from duel.engine.game import Game, move_key
 
 
 def _terminal_value(game: Game) -> float:
@@ -44,6 +44,7 @@ class MctsBot(Bot):
         leaf: str = "rollout",
         rollout_depth: int = 60,
         eval_fn=None,
+        reuse: bool = False,
     ):
         self.sims = sims
         self.c = c
@@ -52,15 +53,51 @@ class MctsBot(Bot):
         self.leaf = leaf
         self.rollout_depth = rollout_depth
         self.eval_fn = eval_fn
+        self.reuse = reuse
+        self._root: _Node | None = None
+        self._root_hist: tuple | None = None
+        self.reused_visits = 0  # диагностика: визиты, принесённые переносом дерева
+
+    def new_game(self) -> None:
+        self._root = None
+        self._root_hist = None
+
+    def _take_root(self, game: Game):
+        """Перенос дерева между ходами (SP-7, по образцу IsmctsBot._take_root):
+        спускаемся из прежнего корня по ходам из game.history; если путь
+        совпал — поддерево со всей статистикой становится новым корнем."""
+        if self._root is None or self._root_hist is None:
+            return None
+        h = game.history
+        rh = self._root_hist
+        if len(h) < len(rh) or h[: len(rh)] != rh:
+            return None
+        node = self._root
+        for k in h[len(rh):]:
+            nxt = None
+            for idx, ch in node.children.items():
+                if move_key(node.moves[idx]) == k:
+                    nxt = ch
+                    break
+            if nxt is None:
+                return None
+            node = nxt
+        return node
 
     def choose(self, game: Game) -> dict:
         moves = game.legal_moves()
         if len(moves) == 1:
             self.last_visits = None
             return moves[0]
-        root = _Node(game.clone())
+        root = self._take_root(game) if self.reuse else None
+        if root is None:
+            root = _Node(game.clone())
+        self.reused_visits = root.n
         for _ in range(self.sims):
             self._simulate(root)
+        if self.reuse:
+            self._root = root
+            self._root_hist = game.history
         visits = [root.children[i].n if i in root.children else 0 for i in range(len(root.moves))]
         self.last_visits = (root.moves, visits)
         self.last_root_value = root.w / max(root.n, 1)
@@ -113,9 +150,10 @@ class MctsBot(Bot):
         # согласны, особый фолбэк для play_from_discard больше не нужен)
         totals = [0] * len(moves)
         per_world = max(1, self.sims // worlds)
+        viewer = game.pending[0]["player"] if game.pending else game.current
         for _wi in range(worlds):
             g = game.clone()
-            g.randomize_hidden(random.Random(self.rng.getrandbits(64)))
+            g.randomize_hidden(random.Random(self.rng.getrandbits(64)), viewer=viewer)
             root = _Node(g)
             saved, self.sims = self.sims, per_world
             for _ in range(per_world):
@@ -162,3 +200,111 @@ class HonestMctsBot(MctsBot):
 
     def choose(self, game: Game) -> dict:
         return self.choose_pimc(game, worlds=self.worlds)
+
+
+_move_key = move_key  # тот же ключ, что пишет Game.history — нужен для переноса дерева
+
+
+class _IsNode:
+    """Узел общего дерева ISMCTS: дети по ключу хода, статистика делится между
+    всеми мирами; `avail` — сколько раз ход был легален при проходе через узел."""
+
+    __slots__ = ("children", "n", "w", "avail")
+
+    def __init__(self):
+        self.children: dict[tuple, _IsNode] = {}
+        self.n = 0
+        self.w = 0.0
+        self.avail: dict[tuple, int] = {}
+
+
+class IsmctsBot(MctsBot):
+    """Честный поиск с ОДНИМ деревом (single-observer ISMCTS): на каждую симуляцию
+    сэмплируется новый мир (скрытое пересэмплируется, своя рука известна), и
+    симуляция идёт по общему дереву, применяя ходы к состоянию этого мира.
+    В отличие от PIMC (K независимых деревьев по sims/K), вся глубина
+    достаётся каждой симуляции, а статистика ходов копится через миры."""
+
+    def __init__(self, *args, reuse: bool = True, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reuse = reuse
+        self._root: _IsNode | None = None
+        self._root_hist: tuple | None = None
+        self.reused_visits = 0  # диагностика: сколько визитов принёс перенос дерева
+
+    def new_game(self) -> None:
+        self._root = None
+        self._root_hist = None
+
+    def _take_root(self, game: Game) -> _IsNode:
+        """Перенос дерева: спускаемся из прежнего корня по ходам, применённым с
+        тех пор (game.history); если путь есть — поддерево со всей статистикой
+        становится корнем. У PIMC такого нет: его деревья одноразовые."""
+        node = None
+        if self.reuse and self._root is not None and self._root_hist is not None:
+            h = game.history
+            if len(h) >= len(self._root_hist) and h[: len(self._root_hist)] == self._root_hist:
+                node = self._root
+                for k in h[len(self._root_hist):]:
+                    node = node.children.get(k)
+                    if node is None:
+                        break
+        if node is None:
+            node = _IsNode()
+        self.reused_visits = node.n
+        self._root = node
+        self._root_hist = game.history
+        return node
+
+    def choose(self, game: Game) -> dict:
+        moves = game.legal_moves()
+        if len(moves) == 1:
+            return moves[0]
+        viewer = game.pending[0]["player"] if game.pending else game.current
+        root = self._take_root(game)
+        for _ in range(self.sims):
+            g = game.clone()
+            g.randomize_hidden(random.Random(self.rng.getrandbits(64)), viewer=viewer)
+            self._simulate_is(root, g)
+        keys = [_move_key(m) for m in moves]
+        best = max(range(len(moves)), key=lambda i: root.children[keys[i]].n if keys[i] in root.children else -1)
+        return moves[best]
+
+    def _simulate_is(self, root: _IsNode, g: Game) -> float:
+        path: list[_IsNode] = [root]
+        node = root
+        while g.winner is None:
+            legal = g.legal_moves()
+            if not legal:
+                break
+            keys = [_move_key(m) for m in legal]
+            for k in keys:
+                node.avail[k] = node.avail.get(k, 0) + 1
+            untried = [i for i, k in enumerate(keys) if k not in node.children]
+            if untried:
+                i = untried[self.rng.randrange(len(untried))]
+                g.apply(legal[i])
+                child = _IsNode()
+                node.children[keys[i]] = child
+                path.append(child)
+                value = self._leaf_value(g)
+                break
+            actor = g.pending[0]["player"] if g.pending else g.current
+            sign = 1.0 if actor == 0 else -1.0
+            best_i, best_u = 0, -1e18
+            for i, k in enumerate(keys):
+                ch = node.children[k]
+                u = sign * ch.w / (ch.n + 1e-9) + self.c * math.sqrt(math.log(node.avail[k] + 1) / (ch.n + 1e-9))
+                if u > best_u:
+                    best_i, best_u = i, u
+            g.apply(legal[best_i])
+            node = node.children[keys[best_i]]
+            path.append(node)
+        else:
+            value = _terminal_value(g)
+        if g.winner is None and "value" not in locals():
+            value = self._leaf_value(g)
+        for nd in path:
+            nd.n += 1
+            nd.w += value
+        return value

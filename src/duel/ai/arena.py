@@ -12,25 +12,41 @@ K = 24
 MAX_MOVES = 600
 
 
-def play_game(bot0: Bot, bot1: Bot, seed: int) -> int | str:
-    """bot0 plays Fellowship (player 0), bot1 plays Sauron. Returns winner.
+def play_game(bot0: Bot, bot1: Bot, seed: int, *, allies: bool = False, promo: bool = False) -> int | str:
+    """bot0 plays Fellowship (player 0), bot1 plays Sauron. Returns winner."""
+    return play_game_ex(bot0, bot1, seed, allies=allies, promo=promo)[0]
+
+
+def play_game_ex(
+    bot0: Bot,
+    bot1: Bot,
+    seed: int,
+    *,
+    allies: bool = False,
+    promo: bool = False,
+    rules: dict | None = None,
+) -> tuple[int | str, str | None]:
+    """Как play_game, но возвращает (победитель, причина): quest / races /
+    conquest — «чистые» победы, presence — тай-брейк по счёту присутствия в конце
+    третьей эпохи, None — незавершённая партия (лимит ходов).
 
     Боты с особыми правилами партии (автома соло-варианта) объявляют их через
     duck-typed хук ``game_rules(side)``; хук ``after_apply(game, move)``
     вызывается после применения хода (сверка повтора хода автомы).
+    ``allies``/``promo`` — режимы партии (дополнение «Союзники», промо-тайлы).
     """
-    rules: dict | None = None
+    rules = dict(rules) if rules else None
     for side, bot in ((0, bot0), (1, bot1)):
         hook = getattr(bot, "game_rules", None)
         if hook is not None:
             rules = {**(rules or {}), **hook(side)}
-    g = Game(seed=seed, rules=rules)
+    g = Game(seed=seed, rules=rules, allies=allies, promo=promo)
     bots = {0: bot0, 1: bot1}
     bot0.new_game()
     bot1.new_game()
     for _ in range(MAX_MOVES):
         if g.winner is not None:
-            return g.winner
+            return g.winner, g.win_reason
         actor = g.pending[0]["player"] if g.pending else g.current
         bot = bots[actor]
         move = bot.choose(g)
@@ -38,7 +54,7 @@ def play_game(bot0: Bot, bot1: Bot, seed: int) -> int | str:
         after = getattr(bot, "after_apply", None)
         if after is not None:
             after(g, move)
-    return "draw"
+    return "draw", None
 
 
 def play_match(a: Bot, b: Bot, n: int, seed0: int = 0) -> dict:

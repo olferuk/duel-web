@@ -46,6 +46,9 @@ class ValueNet(nn.Module):
 
     @torch.no_grad()
     def values(self, obs_batch: np.ndarray) -> np.ndarray:
+        # numpy-путь для одиночных листьев проверялся 2026-08-30: при одном потоке
+        # равен torch (0.2 мс), а с тред-пулом OpenBLAS под нагрузкой в 30× хуже —
+        # не заводить. Узкое место листа — encode() (2.3 мс), не сеть.
         self.eval()
         first = self.net[0]
         if obs_batch.shape[-1] > first.in_features:

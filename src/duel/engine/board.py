@@ -6,7 +6,8 @@ drawing the UI.
 
 Adjacency verified with the owner (board in hand): lindon-enedwaith absent,
 enedwaith-rhovanion PRESENT (fixed 2026-07-28 — bots before this date trained
-on the wrong graph).
+on the wrong graph), rhovanion-mordor ABSENT (fixed 2026-08-29 — bots before
+this date trained with a phantom road into Mordor).
 """
 
 # Neat 3-2-2 grid (rows y=9/26/43): reads like a diagram since we don't
@@ -26,7 +27,9 @@ EDGES: list[tuple[str, str]] = [
     ("arnor", "enedwaith"),
     ("arnor", "rhovanion"),
     ("rhovanion", "rohan"),
-    ("rhovanion", "mordor"),
+    # rhovanion-mordor УБРАНО 2026-08-29 (владелец + арт поля: дороги нет; в Мордор
+    # только через Рохан и Гондор). Индекс ребра в пространстве действий сохранён
+    # (см. ai/actions.py EDGES_DIR) — старые политики совместимы.
     ("enedwaith", "rohan"),
     ("enedwaith", "rhovanion"),  # правка владельца 2026-07-28: соединены!
     ("enedwaith", "gondor"),

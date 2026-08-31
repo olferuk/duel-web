@@ -382,6 +382,7 @@ class NewRoom(BaseModel):
     bot: str | None = None
     side: int = 0  # creator's seat
     promo: bool = False
+    allies: bool = False
     seed: int | None = None
 
 
@@ -416,8 +417,26 @@ def _actor(g: Game) -> int:
     return g.pending[0]["player"] if g.pending else g.current
 
 
+def _hide_ally_hands(d: dict, mode: str, seat: int | None) -> None:
+    """Рука союзников — скрытая информация: вырезаем всё, что не твоё.
+
+    В хот-сите место одно на двоих, поэтому обе руки уезжают клиенту, а прячет
+    их интерфейс (кнопка «показать мою руку»). В PvP и у зрителя чужая рука
+    не должна доходить до браузера вообще — ни списком, ни через подписи ходов
+    призыва, которые называют карту (`moves` уезжают обоим игрокам).
+    """
+    if not d.get("allies") or mode == "hotseat":
+        return
+    for i, pd in enumerate(d.get("players", [])):
+        if i != seat:
+            pd["ally_hand"] = []
+    if d.get("current") != seat:
+        d["moves"] = [m for m in d.get("moves", []) if m.get("type") != "ally_enter"]
+
+
 def _payload(rid: str, room: dict, seat: int | None) -> dict:
     d = room["game"].to_dict()
+    _hide_ally_hands(d, room["mode"], seat)
     d.update(
         room=rid,
         mode=room["mode"],
@@ -464,6 +483,10 @@ def room_new(body: NewRoom, request: Request) -> dict:
             raise HTTPException(429, "слишком много комнат с одного адреса")
     if PUBLIC and body.mode == "bot" and (body.bot or "mcts") not in {m["id"] for m in BOT_MENU}:
         raise HTTPException(400, "неизвестный бот")
+    if body.allies and (body.mode == "tutorial" or (body.bot or "").startswith("automa-")):
+        # герои (поиск по legal_moves) играют с союзниками — лаборатория 2026-08-30:
+        # gala_gen6 бьёт эвристику 66% @120 / 81% @300 в allies; автома — только база
+        raise HTTPException(400, "режим «Союзники» недоступен в туториале и против автомы")
     rid = secrets.token_urlsafe(4)
     token = secrets.token_urlsafe(9)
     side = 1 if body.side == 1 else 0
@@ -477,7 +500,9 @@ def room_new(body: NewRoom, request: Request) -> dict:
         bot = GreedyBot(seed=TUTORIAL_BOT_SEED)
         bot_seat = 1
         seats = {side: token, bot_seat: "__bot__"}
-        body = body.model_copy(update={"seed": TUTORIAL_SEED, "promo": False})
+        body = body.model_copy(
+            update={"seed": TUTORIAL_SEED, "promo": False, "allies": False}
+        )
     elif body.mode == "bot":
         bot_kind = body.bot or "mcts"
         bot = _make_bot(bot_kind, seed=int(time.time()) % 100_000)
@@ -490,8 +515,9 @@ def room_new(body: NewRoom, request: Request) -> dict:
         seats = {0: token, 1: token}
     else:
         seats = {side: token, 1 - side: None}
+    allies = body.allies
     ROOMS[rid] = {
-        "game": Game(seed=body.seed, promo=body.promo, rules=rules),
+        "game": Game(seed=body.seed, promo=body.promo, rules=rules, allies=allies),
         "mode": body.mode,
         "seats": seats,
         "bot": bot,
@@ -600,11 +626,36 @@ def warm_up_bots() -> None:
     threading.Thread(target=load, daemon=True).start()
 
 
+def _dual_stack_socket(port: int):
+    """Слушать IPv4 и IPv6 одним сокетом.
+
+    Зачем: в WSL сервер живёт в линуксе, а браузер — в Windows. Windows
+    резолвит `localhost` сначала в IPv6 `::1`, и если сокет только IPv4,
+    КАЖДЫЙ запрос ждёт ~21 с таймаута, прежде чем откатиться на 127.0.0.1 —
+    игра выглядит намертво повисшей. uvicorn на host="::" ставит IPV6_V6ONLY
+    и ломает IPv4, поэтому сокет собираем сами.
+    """
+    import socket
+
+    sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+    sock.bind(("::", port))
+    sock.listen(2048)
+    sock.set_inheritable(True)
+    return sock
+
+
 def main() -> None:
     import os
 
     host = os.environ.get("DUEL_HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", os.environ.get("DUEL_PORT", "8173")))
+    if host in ("::", "dual"):
+        sock = _dual_stack_socket(port)
+        server = uvicorn.Server(uvicorn.Config(app))
+        server.run(sockets=[sock])
+        return
     uvicorn.run(app, host=host, port=port)
 
 

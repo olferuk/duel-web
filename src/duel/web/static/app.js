@@ -79,6 +79,20 @@ const MAPL = {
     rhovanion: { units: [1605, 372], towers: [1422, 323] },
     mordor: { units: [1775, 1117], towers: [1585, 1081] }
   },
+  // точки дорог для жетона Балрога, ключ "a|b" (сортированный); размечать
+  // на /static/markup.html и вставлять сюда; не размеченные — авто-середина
+  roads: {
+    "arnor|lindon": [552, 331],
+    "arnor|enedwaith": [795, 544],
+    "arnor|rhovanion": [1188, 321],
+    "rhovanion|rohan": [1455, 627],
+    "enedwaith|rohan": [1066, 817],
+    "enedwaith|rhovanion": [1138, 615],
+    "enedwaith|gondor": [916, 994],
+    "gondor|rohan": [1219, 1017],
+    "mordor|rohan": [1621, 939],
+    "gondor|mordor": [1391, 1179],
+  },
 };
 const RINGL = {
   W: 4305, H: 486,
@@ -317,11 +331,40 @@ function renderMap() {
         ${n > 1 ? `<b>${n}</b>` : ""}</div>`;
     }
   }
+  // Балрог: перекрытые связи и выбор связи — прямо на карте, в середине дороги.
+  // Точка дороги — из ручной разметки MAPL.roads (/static/markup.html), а без неё
+  // ≈ середина отрезка между центрами табличек регионов.
+  const edgeMid = (key) => {
+    if (MAPL.roads && MAPL.roads[key]) return MAPL.roads[key];
+    const [a, b] = key.split("|").map((k) => MAPL.zones[k]);
+    if (!a || !b) return null;
+    return [(a[0] + a[2] / 2 + b[0] + b[2] / 2) / 2, (a[1] + a[3] / 2 + b[1] + b[3] / 2) / 2];
+  };
+  for (const [key, owner] of Object.entries((G && G.locked_edges) || {})) {
+    const m = edgeMid(key);
+    if (!m) continue;
+    const [a, b] = key.split("|");
+    h += `<div class="map-mark lock" style="${P(m[0], m[1])};width:4.2%"
+      title="Балрог (${SIDE_RU[owner]}): по связи ${REGION_RU[a]} ↔ ${REGION_RU[b]} не может двигаться ${SIDE_RU[1 - owner]}">
+      <img draggable="false" src="/static/art/allies/power-small.png"></div>`;
+  }
+  const lockMoves = G && canAct() ? G.moves.filter((m) => m.type === "lock_link") : [];
+  lockMoves.forEach((mv, i) => {
+    const m = edgeMid(mv.edge);
+    if (!m) return;
+    h += `<div class="map-edge-target" data-lock="${i}" style="${P(m[0], m[1])}" title="${mv.label}"></div>`;
+  });
   el.innerHTML = h;
   el.querySelectorAll("[data-clickable]").forEach((z) =>
     z.addEventListener("click", (ev) => {
       ev.stopPropagation();
       onRegionClick(z.dataset.region);
+    })
+  );
+  el.querySelectorAll("[data-lock]").forEach((t) =>
+    t.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      doMove(lockMoves[Number(t.dataset.lock)]);
     })
   );
 }
@@ -375,7 +418,15 @@ function renderTableau() {
   const movesBySlot = {};
   if (canAct())
     for (const m of G.moves)
-      if (m.type === "play" || m.type === "discard" || m.type === "shire_pick")
+      // выбор цели для эффектов союзников идёт по тем же картам раскладки:
+      // «слот 12» в меню игроку ничего не говорит, тапать надо по самой карте
+      if (
+        m.type === "play" ||
+        m.type === "discard" ||
+        m.type === "shire_pick" ||
+        m.type === "faramir_pick" ||
+        m.type === "grima_target"
+      )
         (movesBySlot[m.slot] = movesBySlot[m.slot] || []).push(m);
 
   const xs = state.slots.map((s) => s.x);
@@ -400,9 +451,15 @@ function renderTableau() {
       ]
         .filter(Boolean)
         .join(" ");
-      const content = s.revealed
-        ? cardFace(s.card, s.price)
-        : `<span class="slot-id" style="color:#c9b280">${s.id}</span>`;
+      // жетон Силы лежит НА карте: его забирает тот, чьё действие её вскроет
+      const power = (G.power_slots || []).includes(s.id)
+        ? `<img class="power-on-card" draggable="false" src="/static/art/allies/power-small.png"
+             title="Жетон Силы: достанется тому, кто вскроет эту карту">`
+        : "";
+      const content =
+        (s.revealed
+          ? cardFace(s.card, s.price)
+          : `<span class="slot-id" style="color:#c9b280">${s.id}</span>`) + power;
       const left = cx + s.x * unitX - CARD_W / 2;
       const top = 15 + s.row * STEP_Y;
       return `<div class="${cls}" data-slot="${s.id}" style="left:${left}px;top:${top}px">${content}</div>`;
@@ -433,11 +490,21 @@ function renderTableau() {
   }
 }
 
-let chooserEl = null;
+let chooserEl = null, chooserAnchor = null;
 function closeChooser() {
   if (chooserEl) {
     chooserEl.remove();
     chooserEl = null;
+    // карта руки держалась поднятой ради меню — опускаем вместе с ним
+    const row = chooserAnchor && chooserAnchor.closest && chooserAnchor.closest(".ally-row");
+    chooserAnchor = null;
+    if (row) {
+      setHandHover(row, -1);
+      // спрятанная рука держала одну карту лицом ради меню — прячем обратно;
+      // отложенно, чтобы showChooser успел снять координаты нового якоря
+      if (row.dataset.hand && G && !allyHandOpen(Number(row.dataset.hand)))
+        setTimeout(() => { renderPanels(); renderHand(); }, 0);
+    }
   }
   document.querySelectorAll(".open-pile.show").forEach((el) => el.classList.remove("show"));
 }
@@ -600,11 +667,80 @@ document.addEventListener("click", (e) => {
   if (popEl && !popEl.contains(e.target)) hidePopover();
 }, true);
 
+/* ---------- всплывающие подсказки ---------- */
+
+// Подсказки лежат в потоке `position: fixed` и раскладываются отсюда.
+// Так они физически не могут распереть страницу (раньше подсказка у крайней
+// карты вылезала за окно и добавляла документу полосы прокрутки) и всегда
+// остаются внутри экрана на любом мониторе.
+const POP_SEL = ".card-pop, .lm-pop, .tok-pop";
+const POP_HOSTS = ".stk, .card.faceup, .tile, .tok-wrap";
+const POP_PAD = 8;
+let popHost = null;
+
+// Единственная живая подсказка лежит в слое НА ТЕЛЕ страницы, а не внутри
+// карточки. Иначе её ломают предки: раскладка ужата через `zoom`, и
+// fixed-потомок внутри zoom-контейнера считает координаты в его масштабе —
+// подсказка карты пирамиды уезжала на сотни пикселей мимо экрана.
+const popLayer = document.createElement("div");
+popLayer.id = "pop-layer";
+document.body.appendChild(popLayer);
+
+function hidePop() {
+  popLayer.style.display = "";
+  popHost = null;
+}
+
+// force=true — сторона не переворачивается, даже если места не хватает
+// (подсказка лишь прижимается к краю окна): рука союзников всегда вниз,
+// иначе у соседних карт подсказки прыгали то вверх, то вниз
+function showPop(host, above, force) {
+  const src = host.querySelector(POP_SEL);
+  if (!src) return;
+  popHost = host;
+  popLayer.className = src.className; // забираем оформление исходной подсказки
+  popLayer.innerHTML = src.innerHTML;
+  popLayer.style.display = "block";
+  popLayer.style.left = "0px";
+  popLayer.style.top = "0px";
+  const h = host.getBoundingClientRect();
+  const p = popLayer.getBoundingClientRect();
+  const maxL = Math.max(POP_PAD, window.innerWidth - p.width - POP_PAD);
+  const maxT = Math.max(POP_PAD, window.innerHeight - p.height - POP_PAD);
+  const fitsAbove = h.top - p.height - POP_PAD >= 0;
+  const fitsBelow = h.bottom + p.height + POP_PAD <= window.innerHeight;
+  const up = force ? !!above : above ? fitsAbove || !fitsBelow : !fitsBelow && fitsAbove;
+  const left = h.left + h.width / 2 - p.width / 2;
+  const top = up ? h.top - p.height - POP_PAD : h.bottom + POP_PAD;
+  popLayer.style.left = Math.round(Math.min(Math.max(left, POP_PAD), maxL)) + "px";
+  popLayer.style.top = Math.round(Math.min(Math.max(top, POP_PAD), maxT)) + "px";
+}
+
+document.addEventListener(
+  "mouseover",
+  (e) => {
+    if (!e.target.closest) return;
+    if (e.target.closest(".ally-row")) return; // рукой управляют зоны, см. bindHandZones
+    const host = e.target.closest(POP_HOSTS);
+    if (!host) return hidePop();
+    if (host === popHost) return; // уже показана для него
+    // стопки, жетоны и карты раскладки раскрываются вверх — снизу под картой
+    // живёт меню действий (showChooser), и они не спорят за одно место;
+    // ориентиры — вниз
+    showPop(host, !!e.target.closest(".stk, .tok-wrap, .card.faceup"));
+  },
+  true
+);
+window.addEventListener("scroll", hidePop, true);
+
 function shortLabel(m) {
   if (m.type === "play")
     return m.chained ? "▶ Сыграть ⛓ 0🪙" : `▶ Сыграть ${m.cost}🪙`;
   if (m.type === "discard") return `🗑 Продать +${m.gain}🪙`;
   if (m.type === "shire_pick") return `Шир ${m.cost != null ? m.cost + "🪙" : ""}`;
+  // на самой карте имя уже видно — в меню оставляем только действие и цену
+  if (m.type === "ally_enter") return "✋ Призвать · 1 жетон";
+  if (m.type === "ally_exit") return "👋 Прощание · 2 жетона";
   return m.label;
 }
 
@@ -627,6 +763,7 @@ function showChooser(anchor, moves) {
   chooserEl.style.left = window.scrollX + r.left + "px";
   chooserEl.style.top = window.scrollY + r.bottom + 4 + "px";
   document.body.appendChild(chooserEl);
+  chooserAnchor = anchor;
 }
 
 /* ---------- landmarks / races / panels ---------- */
@@ -661,9 +798,15 @@ function renderLandmarks() {
         const tag = lm.price
           ? `<div class="price-tag ${lm.price.affordable ? "" : "no"}">${lm.price.coins}🪙</div>`
           : "";
+        const lockedBy = (G.locked_landmarks || {})[lm.id];
+        const lock =
+          lockedBy === undefined
+            ? ""
+            : `<img class="power-lock" draggable="false" src="/static/art/allies/power-small.png"
+                 title="Вождь урук-хай: ориентир заперт, взять его может только ${SIDE_RU[lockedBy]}">`;
         return `<div class="tile art ${m ? "buyable" : ""}" data-tile="${lm.id}">
           <img draggable="false" src="/static/art/landmarks/${lm.id}.jpg">
-          ${tag}
+          ${tag}${lock}
           <div class="lm-pop"><b>${lm.name}</b><br>${LM_TEXT[lm.id] || ""}
             <div class="lm-pop-note">Эффекты: ${eff.join(" ")} · Доплата: +1🪙 за каждую свою крепость</div>
           </div>
@@ -703,12 +846,255 @@ function renderRaces() {
             )
             .join("")}</div>`
         : "";
+      const lockedBy = (G.locked_stacks || {})[race];
+      const lock =
+        lockedBy === undefined
+          ? ""
+          : `<img class="power-lock" draggable="false" src="/static/art/allies/power-small.png"
+               title="Шелоб: стопка заперта, брать и смотреть может только ${SIDE_RU[lockedBy]}">`;
       return `<div class="race-token-art">
         <img draggable="false" src="/static/art/tokens/_back_${race}.png">
-        <small>×${n}</small>${pop}
+        <small>×${n}</small>${lock}${pop}
       </div>`;
     })
     .join("");
+}
+
+/* ---------- DLC Allies ---------- */
+
+// Хот-сит: рука обоих приезжает в браузер, но по умолчанию закрыта.
+// Два независимых способа подсмотреть — кнопка (залипающая) и наведение
+// (пока курсор в зоне). Кнопка всегда главнее: если ею закрыли, наведение
+// не открывает, пока курсор не выйдет и не вернётся (иначе «скрыть» под
+// курсором мгновенно отменяется наведением и выглядит сломанной).
+const allyPeek = { turn: -1, sticky: false, hover: false, muted: false };
+
+function allyPeekReset() {
+  allyPeek.sticky = allyPeek.hover = allyPeek.muted = false;
+  allyPeek.turn = -1;
+}
+
+// перерисовываем руки, только если видимость реально изменилась: иначе
+// перерисовка подсовывает под курсор новый элемент, он шлёт mouseenter,
+// тот снова перерисовывает — и так по кругу
+function setAllyPeek(patch) {
+  if (!G) return;
+  const before = allyHandOpen(G.current);
+  if (allyPeek.turn !== G.turn_no) allyPeekReset();
+  Object.assign(allyPeek, patch);
+  allyPeek.turn = G.turn_no;
+  if (allyHandOpen(G.current) !== before) {
+    renderPanels();
+    renderHand();
+  }
+}
+
+const ALLY_BACK = ["_back_brotherhood", "_back_sauron"];
+
+// «1 жетон / 2 жетона / 5 жетонов» — счётчик на виду весь ход, режет глаз
+function plural(n, one, few, many) {
+  const m100 = n % 100;
+  if (m100 >= 11 && m100 <= 14) return many;
+  const m10 = n % 10;
+  if (m10 === 1) return one;
+  if (m10 >= 2 && m10 <= 4) return few;
+  return many;
+}
+
+function allyHandOpen(seat) {
+  if (!G.allies) return false;
+  if (ROOM && ROOM.mode === "hotseat") {
+    if (seat !== G.current) return false; // чужую руку не показываем никогда
+    if (allyPeek.turn !== G.turn_no) return false; // новый ход — снова закрыто
+    return allyPeek.sticky || allyPeek.hover;
+  }
+  return seat === mySeat(); // своё устройство — своя рука всегда открыта
+}
+
+// ходы призыва, привязанные к конкретной карте: играем ТАП ПО КАРТЕ,
+// а не только кнопкой в общем меню выбора
+function allyMovesFor(id) {
+  if (!G || !canAct()) return [];
+  return (G.moves || []).filter(
+    (m) => (m.type === "ally_enter" || m.type === "ally_exit") && m.ally === id
+  );
+}
+
+function allyCard(a, cls) {
+  const playable = allyMovesFor(a.id).length ? " playable" : "";
+  return `<div class="ally ${cls}${playable}" data-ally="${a.id}">
+    <img draggable="false" src="/static/art/allies/${a.id}.jpg">
+    <div class="card-pop"><b>${a.name}</b>
+      <div class="ally-eff"><i>Призыв (1 жетон):</i> ${a.enter}</div>
+      <div class="ally-eff"><i>Прощание (2 жетона):</i> ${a.exit}</div>
+    </div>
+  </div>`;
+}
+
+function allyBack(seat) {
+  return `<div class="ally back">
+    <img draggable="false" src="/static/art/allies/${ALLY_BACK[seat]}.jpg">
+  </div>`;
+}
+
+// карта руки, у которой сейчас открыто меню действий: она остаётся лицом
+// вверх, даже когда остальная рука уже спрятана
+function pinnedAlly(seat) {
+  if (!chooserEl || !chooserAnchor || !chooserAnchor.dataset || !chooserAnchor.dataset.ally) return null;
+  const row = chooserAnchor.closest(".ally-row");
+  return row && row.dataset.hand === String(seat) ? chooserAnchor.dataset.ally : null;
+}
+
+function alliesBlock(seat) {
+  if (!G.allies) return "";
+  const pl = G.players[seat];
+  const open = allyHandOpen(seat);
+  const pinned = pinnedAlly(seat);
+  const hand = open
+    ? pl.ally_hand.map((a) => allyCard(a, "hand")).join("")
+    : pinned && pl.ally_hand && pl.ally_hand.length === pl.ally_hand_count
+      ? pl.ally_hand.map((a) => (a.id === pinned ? allyCard(a, "hand") : allyBack(seat))).join("")
+      : Array.from({ length: pl.ally_hand_count }, () => allyBack(seat)).join("");
+  // кнопка «показать руку» нужна только без мыши: с мышью рука открывается наведением
+  const peekable =
+    !HAS_HOVER && ROOM && ROOM.mode === "hotseat" && seat === G.current && pl.ally_hand_count;
+  const peek = peekable
+    ? `<button class="btn small ally-peek" data-peek="${open ? "0" : "1"}">
+         ${open ? "🙈 скрыть руку" : "👁 показать мою руку"}</button>`
+    : "";
+  const rows = [];
+  if (pl.ally_hand_count)
+    rows.push(`<div class="ally-row" data-hand="${seat}">${hand}</div>`);
+  if (pl.ally_open.length)
+    rows.push(
+      `<div class="ally-row">${pl.ally_open.map((a) => allyCard(a, "open")).join("")}</div>`
+    );
+  if (pl.ally_gone.length)
+    rows.push(
+      `<div class="ally-row">${pl.ally_gone.map((a) => allyCard(a, "gone")).join("")}</div>`
+    );
+  const locks = G.quest_locks && G.quest_locks[seat]
+    ? `<span class="ally-lock" title="Том Бомбадил: столько продвижений по треку Кольца
+уйдёт на снятие жетонов, прежде чем двигаться">🚫💍 ${G.quest_locks[seat]}</span>`
+    : "";
+  return `<div class="allies-box">
+    <div class="power-line">
+      <img class="power-ico" draggable="false" src="/static/art/allies/power-small.png">
+      <b>${pl.power}</b> <span class="power-cap">${plural(pl.power, "жетон", "жетона", "жетонов")} Силы</span>${locks}${peek}
+    </div>
+    ${rows.join("")}
+  </div>`;
+}
+
+const HAS_HOVER = window.matchMedia && window.matchMedia("(hover: hover)").matches;
+
+// Снять глушилку наведения, когда курсор реально ушёл из зоны руки.
+// На mouseleave полагаться нельзя: перерисовка подменяет элемент под курсором,
+// и браузер шлёт boundary-события уже другому узлу — «скрыть» залипало навсегда.
+function armUnmute() {
+  const off = (ev) => {
+    if (ev.target && ev.target.closest && ev.target.closest(".ally-row[data-hand]")) return;
+    allyPeek.muted = false;
+    document.removeEventListener("pointermove", off, true);
+  };
+  document.addEventListener("pointermove", off, true);
+}
+
+function bindAllies(root) {
+  if (!root) return;
+  root.querySelectorAll(".ally-peek").forEach((b) =>
+    b.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      const show = b.dataset.peek === "1";
+      // закрыли кнопкой, а курсор всё ещё над зоной — глушим наведение
+      // до тех пор, пока курсор не уйдёт и не вернётся
+      setAllyPeek({ sticky: show, hover: show ? allyPeek.hover : false, muted: !show });
+      if (!show) armUnmute();
+    })
+  );
+  // наведение — только там, где есть настоящая мышь; на тач-экране кнопка
+  if (HAS_HOVER && ROOM && ROOM.mode === "hotseat") {
+    root.querySelectorAll(".ally-row[data-hand]").forEach((row) => {
+      if (Number(row.dataset.hand) !== G.current) return;
+      row.addEventListener("mouseenter", () => {
+        if (!allyPeek.muted) setAllyPeek({ hover: true });
+      });
+      row.addEventListener("mouseleave", () => setAllyPeek({ hover: false, muted: false }));
+    });
+  }
+  root.querySelectorAll(".ally-row").forEach(bindHandZones);
+}
+
+/* Веер руки: карты лежат внахлёст, и увеличенная карта накрывает соседку.
+   Если полагаться на :hover, курсор «залипает» на поднятой карте и до соседней
+   не добраться — как в настольном симуляторе, целимся не по видимой картинке,
+   а по ЗОНЕ вдоль руки: у каждой карты своя полоса по X, ширина полосы равна
+   шагу нахлёста (у последней — вся её ширина). Подъём делается трансформом
+   картинки, поэтому прямоугольник самой карты не меняется и зоны стабильны. */
+function handCards(row) {
+  return [...row.children].filter((c) => c.classList.contains("ally"));
+}
+
+function handZoneIndex(row, x) {
+  const cards = handCards(row);
+  if (!cards.length) return -1;
+  const r = cards.map((c) => c.getBoundingClientRect());
+  if (x < r[0].left || x > r[r.length - 1].right) return -1;
+  for (let i = 0; i < cards.length; i++) {
+    const right = i < cards.length - 1 ? r[i + 1].left : r[i].right;
+    if (x < right) return i;
+  }
+  return cards.length - 1;
+}
+
+function setHandHover(row, idx) {
+  const cards = handCards(row);
+  // пока открыто меню действий у карты этой руки, она остаётся поднятой,
+  // даже если курсор ушёл: иначе меню висит над уже спрятанной картой
+  if (chooserEl && chooserAnchor && row.contains(chooserAnchor)) {
+    const pinned = cards.indexOf(chooserAnchor);
+    if (pinned >= 0 && idx !== pinned) idx = pinned;
+  }
+  if (row._hovIdx === idx) return;
+  row._hovIdx = idx;
+  cards.forEach((c, i) => c.classList.toggle("hov", i === idx));
+  hidePop();
+  if (idx >= 0) showPop(cards[idx], false, true);
+}
+
+function bindHandZones(row) {
+  row._hovIdx = undefined;
+  // перерисовка (опрос состояния раз в секунду) подменяет карты под открытым
+  // меню — перевешиваем якорь на новую карту, чтобы она осталась поднятой
+  if (chooserEl && chooserAnchor && chooserAnchor.dataset && chooserAnchor.dataset.ally) {
+    const oldRow = chooserAnchor.closest(".ally-row");
+    if (oldRow && oldRow.dataset.hand === row.dataset.hand) {
+      const cards = handCards(row);
+      const idx = cards.findIndex((c) => c.dataset.ally === chooserAnchor.dataset.ally);
+      if (idx >= 0) {
+        chooserAnchor = cards[idx];
+        row._hovIdx = idx;
+        cards.forEach((c, i) => c.classList.toggle("hov", i === idx));
+      }
+    }
+  }
+  row.addEventListener("pointermove", (e) => {
+    if (e.pointerType === "touch") return; // на тач-экране работает тап
+    setHandHover(row, handZoneIndex(row, e.clientX));
+  });
+  row.addEventListener("pointerleave", () => setHandHover(row, -1));
+  row.addEventListener("click", (e) => {
+    const idx = handZoneIndex(row, e.clientX);
+    if (idx < 0) return;
+    const card = handCards(row)[idx];
+    const moves = allyMovesFor(card.dataset.ally);
+    if (!moves.length) return;
+    e.stopPropagation();
+    closeChooser(); // снять пин с прежней карты до подъёма новой
+    setHandHover(row, idx);
+    showChooser(card, moves);
+    hidePop(); // подсказка и меню оба под картой — меню важнее
+  });
 }
 
 function renderPanels() {
@@ -736,6 +1122,7 @@ function renderPanels() {
       <div class="stat">регионов: ${pl.presence} / 7 · рас: ${pl.race_victory_count} / 6</div>
       <div class="stat">юнитов в запасе: ${pl.supply}</div>
       ${pl.tokens.length ? `<div class="tokens-art">${pl.tokens.map((t) => `<span class="tok-wrap"><img class="tok-art ${t.kind === "instant" ? "used" : ""}" src="/static/art/tokens/${t.id}.png"><span class="tok-pop">${t.text}${t.kind === "instant" ? " <i>(использован)</i>" : ""}</span></span>`).join("")}</div>` : ""}
+      ${alliesBlock(i)}
       <div class="stacks">${cardsHtml}</div>
       ${pl.last_action ? `<div class="last-action">${pl.last_action}</div>` : ""}`);
     const panel = document.getElementById(`panel-${i}`);
@@ -749,6 +1136,9 @@ function renderPanels() {
     else if (ended) badge = '<div class="result-badge draw">🤝 Ничья</div>';
     el.insertAdjacentHTML("afterbegin", badge);
   }
+  // привязываемся строго внутри перерисованных панелей: общий по документу
+  // querySelectorAll вешал бы дубли обработчиков на оверлей руки
+  for (const i of [0, 1]) bindAllies(document.getElementById(`panel-${i}`));
 }
 
 // финал партии: подсвечиваем не только блок, но и КОНКРЕТНЫЙ индикатор причины
@@ -844,15 +1234,19 @@ function renderTurn() {
   renderPrompt();
 }
 
-const MAP_TYPES = ["place", "move", "kill", "retreat"]; // управляются кликами по карте
+const MAP_TYPES = ["place", "move", "kill", "retreat", "lock_link"]; // управляются кликами по карте
 let _mapPendingKey = null;
 let _extraOfferShown = false; // чтобы подскроллить к вопросу ровно один раз
 
 function renderPrompt() {
   const pr = $("#prompt");
-  const all = canAct()
-    ? G.moves.filter((m) => !["play", "discard", "tile", "shire_pick"].includes(m.type))
-    : [];
+  // на десктопе рука союзников видна в панели — призываем тапом по карте,
+  // и дублировать это кнопками сверху незачем; на телефоне панелей нет,
+  // рука живёт в оверлее, поэтому кнопки остаются единственным путём
+  const handOnScreen = window.innerWidth > 820;
+  const hidden = ["play", "discard", "tile", "shire_pick"];
+  if (handOnScreen) hidden.push("ally_enter", "ally_exit");
+  const all = canAct() ? G.moves.filter((m) => !hidden.includes(m.type)) : [];
   const isDiscard = G.pending && G.pending.type === "play_from_discard";
   const canSkip = all.some((m) => m.type === "skip");
   const btnMoves = all.filter((m) => !MAP_TYPES.includes(m.type) && m.type !== "skip");
@@ -884,6 +1278,28 @@ function renderPrompt() {
       box.appendChild(d);
     }
     if (canSkip) box.appendChild(skipBtn());
+  } else if (G.pending && G.pending.type === "ally_offer" && canAct()) {
+    // Вопрос про призыв обязан быть виден ВСЕГДА и всегда иметь выход:
+    // на десктопе призыв делается тапом по карте, поэтому кнопок призыва тут
+    // нет — и без явной кнопки «Завершить ход» ход просто застревал.
+    pr.style.display = "";
+    pr.innerHTML =
+      `<div class="prompt-title">Получен жетон Силы — призвать союзника?` +
+      (handOnScreen ? " Нажми на карту в своей руке." : "") +
+      `</div><div class="prompt-btns"></div>`;
+    const box = pr.querySelector(".prompt-btns");
+    for (const m of btnMoves) {
+      const b = document.createElement("button");
+      b.className = "btn small";
+      b.innerHTML = coinify(m.label);
+      b.addEventListener("click", () => doMove(m));
+      box.appendChild(b);
+    }
+    const end = document.createElement("button");
+    end.className = "btn small ghost";
+    end.textContent = "➡ Завершить ход";
+    end.addEventListener("click", () => doMove({ type: "skip", label: "Пропустить" }));
+    box.appendChild(end);
   } else if (G.pending && G.pending.type === "shire_play" && canAct()) {
     pr.style.display = "";
     pr.innerHTML = `<div class="prompt-title">Шир: выбери видимую карту в раскладке</div>`;
@@ -1011,7 +1427,11 @@ function renderMobile() {
   }
   // сверху справа — жетоны содружества соперника (тап → полный расклад врага)
   const oppToks = ended ? [] : opp.tokens || []; // в финале место нужно под причину победы
-  $("#m-opp").innerHTML = oppToks.length
+  const oppPower =
+    G.allies && !ended
+      ? `<span class="m-power" title="жетоны Силы соперника"><img src="/static/art/allies/power-small.png">${opp.power}</span>`
+      : "";
+  $("#m-opp").innerHTML = oppPower + (oppToks.length
     ? `<span class="opp-toks ${seat === 1 ? "f" : "s"}" id="opp-toks" title="жетоны содружества соперника">🛡` +
       oppToks
         .slice(0, 3)
@@ -1022,11 +1442,18 @@ function renderMobile() {
         .join("") +
       (oppToks.length > 3 ? `<b>+${oppToks.length - 3}</b>` : "") +
       `</span>`
-    : "";
+    : "");
 
   // нижний бар: слева мои деньги, справа деньги врага (цвет по фракции)
   const oppSeat = 1 - seat;
-  $("#dock-coins").innerHTML = coinify(`🪙 ${pl.coins}`);
+  // жетоны Силы стоят рядом с монетами: это вторая валюта хода
+  const powerChip = (p) =>
+    G.allies
+      ? ` <span class="m-power" title="жетоны Силы"><img src="/static/art/allies/power-small.png">${p.power}</span>`
+      : "";
+  // мои жетоны — рядом со своими монетами; жетоны соперника не влезают
+  // в нижний бар на 360–390px, поэтому живут в верхнем баре рядом с его щитом
+  $("#dock-coins").innerHTML = coinify(`🪙 ${pl.coins}`) + powerChip(pl);
   $("#dock-coins").className = "dock-coin " + (seat === 1 ? "s" : "f");
   $("#dock-opp-coins").innerHTML = coinify(`🪙 ${opp.coins}`);
   $("#dock-opp-coins").className = "dock-coin " + (oppSeat === 1 ? "s" : "f");
@@ -1089,6 +1516,10 @@ function renderHand() {
     title = handWho === "me" ? "Мои карты" : `Карты: ${SIDE_RU[1 - mySeat()]}`;
     sum = handSummary(seat);
   }
+  // союзники живут в том же оверлее: на телефоне боковых панелей нет
+  if (handWho !== "sold" && G.allies) {
+    sum += alliesBlock(handWho === "me" ? mySeat() : 1 - mySeat());
+  }
   $("#hand-sum").innerHTML = sum;
   $("#hand-title").textContent = title;
   $("#hand-me").classList.toggle("on", handWho === "me");
@@ -1110,6 +1541,7 @@ function renderHand() {
           `</div>`
       )
       .join("") || "<p class='small'>карт пока нет</p>";
+  bindAllies($("#hand-overlay"));
 }
 
 /* ---------- автома: карта решения и ход рассуждений ---------- */
@@ -1206,6 +1638,12 @@ function renderAll() {
 
 const PROMO_CHIP =
   ' <span class="promo-chip" title="В партии участвуют промо-тайлы Шир и Гронд">промо</span>';
+const ALLIES_CHIP =
+  ' <span class="promo-chip allies-chip" title="Дополнение «Союзники»: жетоны Силы и карты союзников">союзники</span>';
+
+function modeChips(resp) {
+  return (resp.promo ? PROMO_CHIP : "") + (resp.allies ? ALLIES_CHIP : "");
+}
 
 function setRoom(resp) {
   ROOM = { id: resp.room, token: resp.token || (ROOM && ROOM.token), seat: resp.seat ?? (ROOM && ROOM.seat), mode: resp.mode };
@@ -1224,7 +1662,7 @@ function setRoom(resp) {
   } else {
     info.textContent = "hot-seat";
   }
-  if (resp.promo) info.innerHTML += PROMO_CHIP;
+  info.innerHTML += modeChips(resp);
   renderAll();
 }
 
@@ -1366,6 +1804,13 @@ async function loadBotMenu() {
         pickedBot = m.id;
         markPicked(btn);
         $("#bot-desc").textContent = m.desc || "";
+        // герои играют оба режима (E10: один универсал); автома — только базу
+        const al = $("#bot-allies");
+        if (al) {
+          al.disabled = isAutoma;
+          if (isAutoma) al.checked = false;
+          al.closest("label").classList.toggle("off", isAutoma);
+        }
       });
       (isAutoma ? abox : box).appendChild(btn);
     }
@@ -1424,6 +1869,7 @@ $("#start-bot").addEventListener("click", async () => {
       bot: pickedBot || "mcts",
       side: chosenSide("#side-select"),
       promo: $("#promo").checked,
+      allies: $("#bot-allies").checked,
     });
   } catch (e) {
     toast("Не удалось создать партию: " + e.message);
@@ -1432,13 +1878,25 @@ $("#start-bot").addEventListener("click", async () => {
   setRoom(resp);
   ROOM.botLabel = picked ? picked.textContent : pickedBot;
   $("#room-info").textContent = `против бота: ${ROOM.botLabel}`;
-  if (resp.promo) $("#room-info").innerHTML += PROMO_CHIP;
+  $("#room-info").innerHTML += modeChips(resp);
   hideLobby();
   await botIfNeeded(); // if the bot's side opens the game
 });
 
-$("#lobby-hotseat").addEventListener("click", async () => {
-  const resp = await post("/api/room/new", { mode: "hotseat" });
+$("#lobby-hotseat").addEventListener("click", () => showSection("lobby-hotseat-opts"));
+
+$("#start-hotseat").addEventListener("click", async () => {
+  let resp;
+  try {
+    resp = await post("/api/room/new", {
+      mode: "hotseat",
+      promo: $("#hs-promo").checked,
+      allies: $("#hs-allies").checked,
+    });
+  } catch (e) {
+    toast("Не удалось создать партию: " + e.message);
+    return;
+  }
   setRoom(resp);
   hideLobby();
 });
@@ -1461,6 +1919,7 @@ $("#start-pvp").addEventListener("click", async () => {
     mode: "pvp",
     side: chosenSide("#pvp-side-select"),
     promo: $("#pvp-promo").checked,
+    allies: $("#pvp-allies").checked,
   });
   setRoom(resp);
   const link = `${location.origin}/?room=${resp.room}`;
@@ -1576,7 +2035,7 @@ $("#confirm-modal").addEventListener("click", (ev) => {
 (async function init() {
   // браузеры восстанавливают состояние чекбоксов после перезагрузки (bfcache) —
   // промо-режим включался «сам собой»; в лобби всегда стартуем с выключенного
-  for (const id of ["promo", "pvp-promo"]) {
+  for (const id of ["promo", "bot-allies", "pvp-promo", "hs-promo", "pvp-allies", "hs-allies"]) {
     const el = document.getElementById(id);
     if (el) el.checked = false;
   }
