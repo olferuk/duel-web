@@ -125,6 +125,11 @@ BOT_MENU = [
         "desc": "Владычица Лориэна, шестое воплощение династии: союзы шести рас (MCTS-240)",
     },
     {
+        "id": "manwe",
+        "label": "🦅 Манвэ · ELO ≈1250",
+        "desc": "Король Валар, владыка ветров: сеть-ученица поиска Галадриэли (Зевс-линия, MCTS-240). Честный, без подглядываний",
+    },
+    {
         "id": "champion",
         "label": "Гэндальф · ELO ≈1100",
         "desc": "Экс-чемпион: глубокий поиск (MCTS-240) + нейросеть w3. Честный, без подглядываний",
@@ -226,7 +231,7 @@ def list_bots() -> dict:
         bots = ["mcts300-v8", "mcts120-v8", *bots]
     if "w3" in nets:
         bots = ["mcts300-w3", "mcts120-w3", *bots]  # reigning champion first
-    net_needed = {"champion", "strong", "frodo", "witch_king", "galadriel", "gollum"}
+    net_needed = {"champion", "strong", "frodo", "witch_king", "galadriel", "gollum", "manwe"}
     menu = [m for m in BOT_MENU if m["id"] not in net_needed or "w3" in nets]
     return {"bots": bots, "menu": menu}
 
@@ -249,7 +254,13 @@ _NETS: dict = {}
 def _get_net(model: str):
     """Net-like with .values(); torch checkpoint or ONNX depending on the image."""
     if model not in _NETS:
-        if os.environ.get("DUEL_ONNX") == "1":
+        if model.startswith("pv_"):
+            # PVNet (Зевс-линия): торч-чекпоинт несовместим с ValueNet.load,
+            # а у ONNX первый выход — оценка, так что onnxruntime един для dev и прода
+            from duel.ai.onnx_net import OnnxValueNet
+
+            _NETS[model] = OnnxValueNet(model)
+        elif os.environ.get("DUEL_ONNX") == "1":
             from duel.ai.onnx_net import OnnxValueNet
 
             _NETS[model] = OnnxValueNet(model)
@@ -295,6 +306,8 @@ def _make_bot(kind: str, seed: int = 7):
         return HonestMctsBot(sims=120, seed=seed, name=kind, eval_fn=_net_eval("w3"), worlds=4)
     if kind == "mcts":
         return HonestMctsBot(sims=150, seed=seed, name="mcts150-heur", leaf="heuristic", worlds=4)
+    if kind == "manwe":
+        return HonestMctsBot(sims=240, seed=seed, name=kind, eval_fn=_net_eval("pv_v250"), worlds=4)
     if kind == "galadriel":
         try:
             ev = _net_eval("gala_best")  # актуальная чемпионка династии (Γ³)
