@@ -19,49 +19,41 @@ class AllianceToken:
 
 TOKENS: list[AllianceToken] = [
     # Elves
+    AllianceToken("elves_extra_turn", "elves", "passive", "Play a yellow card: take another turn"),
     AllianceToken(
-        "elves_extra_turn", "elves", "passive", "Сыграв жёлтую карту — сделай ещё один ход"
+        "elves_red_any", "elves", "passive", "Red cards: units go to ANY of the 7 regions"
     ),
-    AllianceToken(
-        "elves_red_any", "elves", "passive", "Красные карты: юниты в ЛЮБОЙ из 7 регионов"
-    ),
-    AllianceToken("elves_wild_skill", "elves", "passive", "Раз в ход — любой один навык"),
+    AllianceToken("elves_wild_skill", "elves", "passive", "Once per turn: any one skill"),
     # Dwarves
-    AllianceToken("dwarves_free_tile", "dwarves", "passive", "Тайлы: без доплаты за свои крепости"),
-    AllianceToken("dwarves_tile_turn", "dwarves", "passive", "Купив тайл — сделай ещё один ход"),
-    AllianceToken(
-        "dwarves_green_moves", "dwarves", "passive", "Сыграв зелёную карту — 2 перемещения"
-    ),
+    AllianceToken("dwarves_free_tile", "dwarves", "passive", "Tiles: no extra cost for fortresses"),
+    AllianceToken("dwarves_tile_turn", "dwarves", "passive", "Buy a tile: take another turn"),
+    AllianceToken("dwarves_green_moves", "dwarves", "passive", "Play a green card: 2 moves"),
     # Hobbits
-    AllianceToken("hobbits_eagle", "hobbits", "passive", "Орёл: считается 1 из 6 рас для победы"),
+    AllianceToken("hobbits_eagle", "hobbits", "passive", "Eagle: counts as 1 of the 6 races"),
     AllianceToken(
-        "hobbits_blue_unit", "hobbits", "passive", "Сыграв синюю карту — юнит в любой регион"
+        "hobbits_blue_unit", "hobbits", "passive", "Play a blue card: a unit in any region"
     ),
     AllianceToken(
-        "hobbits_chain_coins", "hobbits", "passive", "Сыграв карту по цепочке — возьми 3 монеты"
+        "hobbits_chain_coins", "hobbits", "passive", "Play a card via chain: take 3 coins"
     ),
     # Humans
+    AllianceToken("humans_yellow_quest", "humans", "passive", "Play a yellow card: +1 Ring step"),
     AllianceToken(
-        "humans_yellow_quest", "humans", "passive", "Сыграв жёлтую карту — +1 шаг Кольца"
+        "humans_red_extra", "humans", "passive", "Red cards: +1 unit in the chosen region"
     ),
-    AllianceToken(
-        "humans_red_extra", "humans", "passive", "Красные карты: +1 юнит в выбранный регион"
-    ),
-    AllianceToken("humans_double_discard", "humans", "passive", "Сброс карты: монеты ×2 (2/4/6)"),
+    AllianceToken("humans_double_discard", "humans", "passive", "Discard a card: coins ×2 (2/4/6)"),
     # Ents (instant)
-    AllianceToken("ents_extra_turn", "ents", "instant", "Сделай ещё один ход"),
+    AllianceToken("ents_extra_turn", "ents", "instant", "Take another turn"),
     AllianceToken(
-        "ents_remove_fort", "ents", "instant", "Убери вражескую крепость (вернётся владельцу)"
+        "ents_remove_fort", "ents", "instant", "Remove an enemy fortress (it returns to its owner)"
     ),
-    AllianceToken(
-        "ents_menu3", "ents", "instant", "3 раза: убрать юнита / враг −1 монета / перемещение"
-    ),
+    AllianceToken("ents_menu3", "ents", "instant", "3 times: remove a unit / enemy −1 coin / move"),
     # Wizards (instant)
-    AllianceToken("wizards_quest2", "wizards", "instant", "Пройди 2 шага по Пути Кольца"),
+    AllianceToken("wizards_quest2", "wizards", "instant", "Advance 2 steps on the Ring Path"),
     AllianceToken(
-        "wizards_units2", "wizards", "instant", "2 юнита: в один регион или в два разных"
+        "wizards_units2", "wizards", "instant", "2 units: in one region or two different ones"
     ),
-    AllianceToken("wizards_discard_play", "wizards", "instant", "Сыграй карту из сброса бесплатно"),
+    AllianceToken("wizards_discard_play", "wizards", "instant", "Play a discarded card for free"),
 ]
 
 BY_ID: dict[str, AllianceToken] = {t.id: t for t in TOKENS}

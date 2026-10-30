@@ -44,17 +44,17 @@ G = frozenset({CardType.GREEN})
 PREF = "pref"  # слот «предпочтение персонажа»
 
 COLOR_RU = {
-    CardType.GREY: "серая",
-    CardType.YELLOW: "жёлтая",
-    CardType.GREEN: "зелёная",
-    CardType.BLUE: "синяя",
-    CardType.RED: "красная",
-    CardType.PURPLE: "фиолетовая",
+    CardType.GREY: "grey",
+    CardType.YELLOW: "yellow",
+    CardType.GREEN: "green",
+    CardType.BLUE: "blue",
+    CardType.RED: "red",
+    CardType.PURPLE: "purple",
 }
 
 # символы повтора хода: паучиха Шелоб и таран Гронд (врата)
 SHELOB, GROND = "shelob", "grond"
-REPEAT_RU = {SHELOB: "Шелоб", GROND: "Гронд"}
+REPEAT_RU = {SHELOB: "Shelob", GROND: "Grond"}
 
 
 @dataclass(frozen=True)
@@ -98,81 +98,81 @@ CHARACTERS: dict[str, Character] = {
     for c in [
         Character(
             "witch_king",
-            "Король-чародей",
+            "Witch-king",
             ("red_extra",),
-            "Красная карта: +1 юнит",
+            "Red card: +1 unit",
             frozenset({SHELOB}),
             frozenset({CardType.RED, CardType.PURPLE}),
             "witchking.jpg",
         ),
         Character(
             "galadriel",
-            "Галадриэль",
+            "Galadriel",
             ("red_extra",),
-            "Красная карта: +1 юнит",
+            "Red card: +1 unit",
             frozenset({SHELOB}),
             frozenset({CardType.RED, CardType.PURPLE}),
             "galadriel.jpg",
         ),
         Character(
             "tom_bombadil",
-            "Том Бомбадил",
+            "Tom Bombadil",
             ("chain_coins3",),
-            "Карта с символом цепочки: +3🪙",
+            "Card with a chain symbol: +3🪙",
             frozenset(),
             frozenset({CardType.GREY}),
             "tom.jpg",
         ),
         Character(
             "saruman",
-            "Саруман",
+            "Saruman",
             ("green_moves2",),
-            "Зелёная карта: 2 перемещения",
+            "Green card: 2 moves",
             frozenset({GROND}),
             frozenset({CardType.GREEN}),
             "saruman.jpg",
         ),
         Character(
             "elrond",
-            "Элронд",
+            "Elrond",
             ("green_moves2",),
-            "Зелёная карта: 2 перемещения",
+            "Green card: 2 moves",
             frozenset({GROND}),
             frozenset({CardType.GREEN}),
             "elrond.jpg",
         ),
         Character(
             "smaug",
-            "Смауг",
+            "Smaug",
             ("yellow_quest",),
-            "Жёлтая карта: +1 шаг по Пути Кольца",
+            "Yellow card: +1 step on the Ring Path",
             frozenset(),
             frozenset({CardType.YELLOW}),
             "smaug.jpg",
         ),
         Character(
             "sauron",
-            "Саурон",
+            "Sauron",
             ("blue_unit",),
-            "Синяя карта: юнит в любой регион",
+            "Blue card: a unit in any region",
             frozenset({SHELOB, GROND}),
             frozenset({CardType.BLUE}),
             "sauron.jpg",
         ),
         Character(
             "gandalf",
-            "Гэндальф",
+            "Gandalf",
             ("blue_unit",),
-            "Синяя карта: юнит в любой регион",
+            "Blue card: a unit in any region",
             frozenset({SHELOB, GROND}),
             frozenset({CardType.BLUE}),
             "gandalf.jpg",
         ),
         Character(
             "eowyns_stew",
-            "Похлёбка Эовин",
+            "Éowyn's Stew",
             ("red_extra", "chain_coins3"),
-            "Красная карта: +1 юнит; карта с цепочкой: +3🪙",
+            "Red card: +1 unit; chain card: +3🪙",
             frozenset({SHELOB, GROND}),
             frozenset({CardType.BLUE}),
             "stew.jpg",
@@ -189,7 +189,7 @@ def automa_rules(character: str, side: int) -> dict:
 def _slot_ru(slot, char: Character) -> str:
     if slot == PREF:
         pref = "/".join(COLOR_RU[t] for t in sorted(char.preferred, key=str))
-        return f"предпочтение ({pref})"
+        return f"preference ({pref})"
     return "/".join(COLOR_RU[t] for t in sorted(slot, key=str))
 
 
@@ -267,7 +267,7 @@ class Automa:
             game.extra_turns -= 1
             self._t(
                 "repeat",
-                "Жетон энтов не даёт второй дополнительный ход (символ повтора уже сработал)",
+                "The Ents token gives no second extra turn (the repeat symbol already fired)",
             )
 
     # -- сериализация для интерфейса ----------------------------------------
@@ -305,14 +305,14 @@ class Automa:
     def _pick_by_die(self, cands: list, reason: str):
         if len(cands) == 1:
             return cands[0]
-        roll = self._die(reason + f" (вариантов: {len(cands)})")
+        roll = self._die(reason + f" ({len(cands)} options)")
         return cands[(roll - 1) % len(cands)]
 
     # -- основной ход --------------------------------------------------------
 
     def _main_move(self, game: Game, p: int) -> dict:
         self.turn_repeat_granted = False
-        self._t("turn", f"— Ход автомы ({self.char.name_ru}) —")
+        self._t("turn", f"— Automa turn ({self.char.name_ru}) —")
         moves = game.legal_moves()
 
         tile_moves = [m for m in moves if m["type"] == "tile"]
@@ -322,16 +322,14 @@ class Automa:
             cost = game.tile_cost(p, LM_BY_ID[game.landmarks_faceup[0]])["coins"]
             self._t(
                 "tile",
-                f"Ориентир не по карману ({game.players[p].coins}🪙 из {cost}) — играет карту",
+                f"Cannot afford a landmark ({game.players[p].coins}🪙 of {cost}), plays a card",
             )
 
         return self._play_by_decision(game, p, moves)
 
     def _buy_tile(self, game: Game, p: int, tile_moves: list[dict]) -> dict:
         cost = tile_moves[0].get("cost", 0)
-        self._t(
-            "tile", f"Монет хватает ({game.players[p].coins}🪙) — покупает ориентир за {cost}🪙"
-        )
+        self._t("tile", f"Enough coins ({game.players[p].coins}🪙), buys a landmark for {cost}🪙")
         if game.presence_count(p) == 6:
             winning = [
                 m
@@ -340,26 +338,26 @@ class Automa:
             ]
             if winning:
                 lm = LM_BY_ID[winning[0]["tile"]]
-                self._t("tile", f"{lm.name_ru} даёт 7-й регион — мгновенная победа!")
+                self._t("tile", f"{lm.name_ru} gives the 7th region: instant victory!")
                 return winning[0]
         names = ", ".join(LM_BY_ID[m["tile"]].name_ru for m in tile_moves)
-        chosen = self._pick_by_die(tile_moves, f"какой ориентир взять: {names}")
-        self._t("tile", f"Выбор кубика: {LM_BY_ID[chosen['tile']].name_ru}")
+        chosen = self._pick_by_die(tile_moves, f"which landmark to take: {names}")
+        self._t("tile", f"Die roll picks: {LM_BY_ID[chosen['tile']].name_ru}")
         return chosen
 
     def _reveal(self) -> DecisionCard:
         if not self.deck:
             self.deck, self.discard = self.discard, []
             self.rng.shuffle(self.deck)
-            self._t("reveal", "Колода решений закончилась — перетасована заново")
+            self._t("reveal", "Decision deck ran out and was reshuffled")
         if self.card is not None:
             self.discard.append(self.card)
         self.card = self.deck.pop(0)
         card = DECISION_CARDS[self.card]
         arrow = "→" if card.direction == "lr" else "←"
         prio = " > ".join(_slot_ru(s, self.char) for s in card.priorities)
-        rep = f", повтор: {REPEAT_RU[card.repeat]}" if card.repeat else ""
-        self._t("reveal", f"Карта решения: {prio}; скан {arrow}{rep}")
+        rep = f", repeat: {REPEAT_RU[card.repeat]}" if card.repeat else ""
+        self._t("reveal", f"Decision card: {prio}; scan {arrow}{rep}")
         return card
 
     def _scan_order(self, game: Game, direction: str) -> list[int]:
@@ -382,17 +380,17 @@ class Automa:
                 chosen_sid = matches[0]
                 self._t(
                     "prio",
-                    f"Приоритет {i} ({_slot_ru(slot, self.char)}): "
-                    f"берёт первую по направлению — {self._card_ru(game, chosen_sid)}",
+                    f"Priority {i} ({_slot_ru(slot, self.char)}): "
+                    f"takes the first in scan order: {self._card_ru(game, chosen_sid)}",
                 )
                 break
-            self._t("prio", f"Приоритет {i} ({_slot_ru(slot, self.char)}): доступных нет")
+            self._t("prio", f"Priority {i} ({_slot_ru(slot, self.char)}): none available")
         if chosen_sid is None:
             chosen_sid = order[0]
-            side_ru = "слева" if dec.direction == "lr" else "справа"
+            side_ru = "left" if dec.direction == "lr" else "right"
             self._t(
                 "prio",
-                f"Совпадений нет — крайняя {side_ru} с нижнего ряда: "
+                f"No match, takes the far {side_ru} of the bottom row: "
                 f"{self._card_ru(game, chosen_sid)}",
             )
 
@@ -414,11 +412,11 @@ class Automa:
         elves_dup = card.type is CardType.YELLOW and "elves_extra_turn" in game.players[p].tokens
         self.turn_repeat_granted = True
         if elves_dup:
-            self._t("repeat", "Символ повтора совпал, но жетон эльфов уже даёт доп. ход — один раз")
+            self._t("repeat", "Repeat matched, but the Elves token already gives one extra turn")
             return
         game.extra_turns += 1
-        game.log.append(f"Автома ({self.char.name_ru}): символ повтора — дополнительный ход")
-        self._t("repeat", f"Символ повтора ({REPEAT_RU[dec.repeat]}) совпал — дополнительный ход!")
+        game.log.append(f"Automa ({self.char.name_ru}): repeat symbol, extra turn")
+        self._t("repeat", f"Repeat symbol ({REPEAT_RU[dec.repeat]}) matched: extra turn!")
 
     # -- разрешение pending-решений ------------------------------------------
 
@@ -473,30 +471,30 @@ class Automa:
         opp = 1 - p
         steps = [
             (
-                "7-й регион — мгновенная победа",
+                "7th region: instant victory",
                 lambda r: game.presence_count(p) == 6 and not game.present(p, r),
             ),
             (
-                "регион без своих юнитов и крепостей",
+                "region with no own units or fortresses",
                 lambda r: game.board_units[r][p] == 0 and game.board_forts[r][p] == 0,
             ),
             (
-                f"у игрока ≤{n} юнитов и нет крепости",
+                f"player has ≤{n} units and no fortress",
                 lambda r: game.board_units[r][opp] <= n and game.board_forts[r][opp] == 0,
             ),
             (
-                f"у игрока ≤{n} юнитов и есть крепость",
+                f"player has ≤{n} units and a fortress",
                 lambda r: game.board_units[r][opp] <= n and game.board_forts[r][opp] > 0,
             ),
         ]
         for i, (label, ok) in enumerate(steps, start=1):
             cands = [r for r in regions if ok(r)]
             if cands:
-                region = self._pick_by_die(cands, f"ничья приоритета «{label}»")
-                self._t("place", f"Юниты ({n}): приоритет {i} «{label}» → {REGION_RU[region]}")
+                region = self._pick_by_die(cands, f"priority tie: {label}")
+                self._t("place", f"Units ({n}): priority {i}, {label} → {REGION_RU[region]}")
                 return region
-        region = self._pick_by_die(regions, "регион для юнитов")
-        self._t("place", f"Юниты: приоритеты не сработали, кубик → {REGION_RU[region]}")
+        region = self._pick_by_die(regions, "region for units")
+        self._t("place", f"Units: no priority applied, die → {REGION_RU[region]}")
         return region
 
     # перемещения (приоритеты фиолетовых карт, стр. 5)
@@ -510,25 +508,25 @@ class Automa:
             and (game.board_units[r][p] > 1 or game.board_forts[r][p] > 0)
         ]
         if not srcs:
-            self._t("move", "Перемещение: нет юнита, которого можно увести — пропуск")
+            self._t("move", "Move: no unit can leave, skipped")
             return {"type": "skip"}
         reach = sorted({d for s in srcs for d in ADJ[s]})
         opp = 1 - p
         steps = [
             (
-                "7-й регион — мгновенная победа",
+                "7th region: instant victory",
                 lambda r: game.presence_count(p) == 6 and not game.present(p, r),
             ),
             (
-                "регион без своих юнитов и крепостей",
+                "region with no own units or fortresses",
                 lambda r: game.board_units[r][p] == 0 and game.board_forts[r][p] == 0,
             ),
             (
-                f"у игрока ≤{n} юнитов и нет крепости",
+                f"player has ≤{n} units and no fortress",
                 lambda r: game.board_units[r][opp] <= n and game.board_forts[r][opp] == 0,
             ),
             (
-                f"у игрока ≤{n} юнитов и есть крепость",
+                f"player has ≤{n} units and a fortress",
                 lambda r: game.board_units[r][opp] <= n and game.board_forts[r][opp] > 0,
             ),
         ]
@@ -536,18 +534,18 @@ class Automa:
         for i, (label, ok) in enumerate(steps, start=1):
             cands = [r for r in reach if ok(r)]
             if cands:
-                dst = self._pick_by_die(cands, f"ничья приоритета «{label}»")
-                self._t("move", f"Перемещение: приоритет {i} «{label}» → {REGION_RU[dst]}")
+                dst = self._pick_by_die(cands, f"priority tie: {label}")
+                self._t("move", f"Move: priority {i}, {label} → {REGION_RU[dst]}")
                 break
         if dst is None:
-            dst = self._pick_by_die(reach, "куда перемещать")
-            self._t("move", f"Перемещение: приоритеты не сработали, кубик → {REGION_RU[dst]}")
+            dst = self._pick_by_die(reach, "where to move")
+            self._t("move", f"Move: no priority applied, die → {REGION_RU[dst]}")
         adj_srcs = [s for s in srcs if dst in ADJ[s]]
         best = max(game.board_units[s][p] for s in adj_srcs)
         src = self._pick_by_die(
-            [s for s in adj_srcs if game.board_units[s][p] == best], "откуда идти"
+            [s for s in adj_srcs if game.board_units[s][p] == best], "where to move from"
         )
-        self._t("move", f"Юнит идёт {REGION_RU[src]} → {REGION_RU[dst]}")
+        self._t("move", f"Unit moves {REGION_RU[src]} → {REGION_RU[dst]}")
         return {"type": "move", "from": src, "to": dst}
 
     # потери игрока (приоритеты фиолетовых карт, стр. 5)
@@ -562,30 +560,30 @@ class Automa:
 
         steps = [
             (
-                "у игрока 1 юнит и нет крепости",
+                "player has 1 unit and no fortress",
                 lambda r: game.board_units[r][opp] == 1 and game.board_forts[r][opp] == 0,
             ),
             (
-                "рядом с юнитами автомы, без крепости",
+                "next to automa units, no fortress",
                 lambda r: near_bot(r) and game.board_forts[r][opp] == 0,
             ),
             (
-                "у игрока 1 юнит и есть крепость",
+                "player has 1 unit and a fortress",
                 lambda r: game.board_units[r][opp] == 1 and game.board_forts[r][opp] > 0,
             ),
             (
-                "рядом с юнитами автомы, с крепостью",
+                "next to automa units, with a fortress",
                 lambda r: near_bot(r) and game.board_forts[r][opp] > 0,
             ),
         ]
         for i, (label, ok) in enumerate(steps, start=1):
             cands = [r for r in regions if ok(r)]
             if cands:
-                region = self._pick_by_die(cands, f"ничья приоритета «{label}»")
-                self._t("kill", f"Потери: приоритет {i} «{label}» → {REGION_RU[region]}")
+                region = self._pick_by_die(cands, f"priority tie: {label}")
+                self._t("kill", f"Losses: priority {i}, {label} → {REGION_RU[region]}")
                 return {"type": "kill", "region": region}
-        region = self._pick_by_die(regions, "чей юнит убрать")
-        self._t("kill", f"Потери: кубик → {REGION_RU[region]}")
+        region = self._pick_by_die(regions, "whose unit to remove")
+        self._t("kill", f"Losses: die → {REGION_RU[region]}")
         return {"type": "kill", "region": region}
 
     # снос крепости: где у игрока меньше всего юнитов (стр. 4/8)
@@ -596,25 +594,25 @@ class Automa:
             return {"type": "skip"}
         fewest = min(game.board_units[r][opp] for r in regions)
         cands = [r for r in regions if game.board_units[r][opp] == fewest]
-        region = self._pick_by_die(cands, "ничья: где меньше всего юнитов игрока")
-        self._t("raze", f"Крепость: у игрока меньше всего юнитов в {REGION_RU[region]} — снос")
+        region = self._pick_by_die(cands, "tie: fewest player units")
+        self._t("raze", f"Fortress: fewest player units in {REGION_RU[region]}, destroyed")
         return {"type": "raze", "region": region}
 
     def _do_extra_offer(self) -> dict:
         if self.turn_repeat_granted:
-            self._t("extra", "Доп. ход с трека: символ повтора уже сработал — отказ")
+            self._t("extra", "Track extra turn: repeat symbol already fired, declined")
             return {"type": "extra", "take": 0}
-        self._t("extra", "Доп. ход с трека: берёт")
+        self._t("extra", "Track extra turn: taken")
         return {"type": "extra", "take": 1}
 
     # жетоны рас: кубик решает (стр. 4); Серые Гавани — только верхний жетон
     def _do_choose_token(self, game: Game, pd: dict) -> dict:
         options = pd["options"]
-        if str(pd.get("why", "")).startswith("Серые Гавани"):
-            self._t("token", "Серые Гавани: берёт верхний жетон стопки")
+        if str(pd.get("why", "")).startswith("Grey Havens"):
+            self._t("token", "Grey Havens: takes the top token of the stack")
             return {"type": "pick_token", "token": options[0]}
-        chosen = self._pick_by_die(options, "какой жетон расы взять")
-        self._t("token", "Кубик выбрал жетон")
+        chosen = self._pick_by_die(options, "which race token to take")
+        self._t("token", "Die picked a token")
         return {"type": "pick_token", "token": chosen}
 
     def _do_choose_race(self, game: Game) -> dict:
@@ -622,10 +620,10 @@ class Automa:
         if game.chapter == 3:
             late = [r for r in races if r in ("ents", "wizards")]
             if late:
-                self._t("token", "3-я эпоха: кубик только между энтами и волшебниками")
+                self._t("token", "Chapter 3: die only between Ents and Wizards")
                 races = late
-        race = self._pick_by_die(races, "стопка какой расы")
-        self._t("token", f"Серые Гавани: раса — {RACE_RU[race]}")
+        race = self._pick_by_die(races, "which race stack")
+        self._t("token", f"Grey Havens: race {RACE_RU[race]}")
         return {"type": "pick_race", "race": race}
 
     # Барад-Дур / жетон волшебников: сыграть из сброса по новой карте решения
@@ -633,7 +631,7 @@ class Automa:
         if not moves:
             return {"type": "skip"}
         dec = self._reveal()
-        self._t("prio", "Игра из сброса: цвета по карте решения, ничьи — старшая эпоха")
+        self._t("prio", "Play from discard: decision card colors, ties go to the latest chapter")
         cands_all = list(range(len(game.discard_open)))
         for slot in dec.priorities:
             colors = self.char.preferred if slot == PREF else slot
@@ -641,11 +639,11 @@ class Automa:
             if cands:
                 best_ch = max(game.discard_open[i].chapter for i in cands)
                 cands = [i for i in cands if game.discard_open[i].chapter == best_ch]
-                idx = self._pick_by_die(cands, "ничья по эпохе")
+                idx = self._pick_by_die(cands, "chapter tie")
                 return {"type": "discard_play", "index": idx}
         best_ch = max(game.discard_open[i].chapter for i in cands_all)
         cands = [i for i in cands_all if game.discard_open[i].chapter == best_ch]
-        idx = self._pick_by_die(cands, "совпадений нет — старшая эпоха")
+        idx = self._pick_by_die(cands, "no match, latest chapter")
         return {"type": "discard_play", "index": idx}
 
     # Изенгард: серую карту навыка, которого у игрока меньше всего (стр. 8)
@@ -665,7 +663,7 @@ class Automa:
             return (fewest, -c.chapter, 0 if c.gives_link else 1)
 
         best = min(moves, key=score)
-        self._t("strip", f"Изенгард: снимает {best['label']}")
+        self._t("strip", f"Isengard: takes {best['label']}")
         return best
 
     # Шир: обзор слева-направо сверху-вниз, но по приоритетам карты решения
@@ -679,9 +677,9 @@ class Automa:
             colors = self.char.preferred if slot == PREF else slot
             matches = [sid for sid in order if game.tableau.cards[sid].type in colors]
             if matches:
-                self._t("prio", f"Шир: {self._card_ru(game, matches[0])}")
+                self._t("prio", f"The Shire: {self._card_ru(game, matches[0])}")
                 return next(m for m in moves if m["slot"] == matches[0])
-        self._t("prio", f"Шир: совпадений нет — первая видимая {self._card_ru(game, order[0])}")
+        self._t("prio", f"The Shire: no match, first visible {self._card_ru(game, order[0])}")
         return next(m for m in moves if m["slot"] == order[0])
 
     # Гронд: крепость там, где у игрока больше всего юнитов (стр. 8)
@@ -691,16 +689,16 @@ class Automa:
         opp = 1 - p
         best = max(game.board_units[m["region"]][opp] for m in moves)
         cands = [m for m in moves if game.board_units[m["region"]][opp] == best]
-        chosen = self._pick_by_die(cands, "ничья: где больше всего юнитов игрока")
-        self._t("raze", f"Гронд: штурм {REGION_RU[chosen['region']]}")
+        chosen = self._pick_by_die(cands, "tie: most player units")
+        self._t("raze", f"Grond: assault on {REGION_RU[chosen['region']]}")
         return chosen
 
     def _do_grond_retreat(self, game: Game, p: int, pd: dict, moves: list[dict]) -> dict:
         opp = 1 - p
         occupied = [m for m in moves if game.present(opp, m["to"])]
         cands = occupied or moves
-        chosen = self._pick_by_die(cands, "куда отступают юниты игрока")
-        self._t("raze", f"Гронд: отступление игрока в {REGION_RU[chosen['to']]}")
+        chosen = self._pick_by_die(cands, "where player units retreat")
+        self._t("raze", f"Grond: player retreats to {REGION_RU[chosen['to']]}")
         return chosen
 
     # жетон энтов «3 раза»: кубик выбирает эффект (стр. 7)
@@ -714,13 +712,13 @@ class Automa:
             kinds.append("move")
         if not kinds:
             return {"type": "skip"}
-        roll = self._die("эффект энтов: 1-2 юнит, 3-4 монета, 5-6 перемещение")
+        roll = self._die("Ents effect: 1-2 unit, 3-4 coin, 5-6 move")
         want = ("kill", "kill", "coin", "coin", "move", "move")[roll - 1]
         if want not in kinds:
             want = kinds[(roll - 1) % len(kinds)]
-            self._t("token", "Выпавший эффект недоступен — ближайший доступный")
+            self._t("token", "Rolled effect unavailable, using the nearest available")
         if want == "coin":
-            self._t("token", "Энты: игрок теряет монету")
+            self._t("token", "Ents: player loses a coin")
             return {"type": "ents_coin"}
         if want == "kill":
             mv = self._do_kill(game, p, {"n": 1})

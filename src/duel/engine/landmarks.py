@@ -28,14 +28,14 @@ class Landmark:
 LANDMARKS: list[Landmark] = [
     Landmark(
         id="barad_dur",
-        name_ru="Барад-Дур",
+        name_ru="Barad-dûr",
         region="mordor",
         cost=("Heart", "Heart", "Heart", "Crown", "Crown", "Book"),
         effect="play_from_discard",
     ),
     Landmark(
         id="bree",
-        name_ru="Бри",
+        name_ru="Bree",
         region="arnor",
         cost=("Fist", "Fist", "Fist", "Heart", "Heart", "Crown"),
         units=2,
@@ -43,7 +43,7 @@ LANDMARKS: list[Landmark] = [
     ),
     Landmark(
         id="erebor",
-        name_ru="Эребор",
+        name_ru="Erebor",
         region="rhovanion",
         cost=("Face", "Fist", "Fist", "Heart", "Crown", "Book"),
         coins=5,
@@ -51,21 +51,21 @@ LANDMARKS: list[Landmark] = [
     ),
     Landmark(
         id="grey_havens",
-        name_ru="Серые Гавани",
+        name_ru="Grey Havens",
         region="lindon",
         cost=("Fist", "Fist", "Fist", "Crown", "Crown", "Book"),
         effect="grey_havens_tokens",
     ),
     Landmark(
         id="helms_deep",
-        name_ru="Хельмова Падь",
+        name_ru="Helm's Deep",
         region="rohan",
         cost=("Face", "Face", "Face", "Crown", "Crown", "Book"),
         units=3,
     ),
     Landmark(
         id="isengard",
-        name_ru="Изенгард",
+        name_ru="Isengard",
         region="enedwaith",
         cost=("Face", "Face", "Heart", "Heart", "Heart", "Book"),
         quest_steps=1,
@@ -73,7 +73,7 @@ LANDMARKS: list[Landmark] = [
     ),
     Landmark(
         id="minas_tirith",
-        name_ru="Минас Тирит",
+        name_ru="Minas Tirith",
         region="gondor",
         cost=("Face", "Face", "Face", "Fist", "Book", "Book"),
         units=1,
@@ -81,7 +81,7 @@ LANDMARKS: list[Landmark] = [
     ),
     Landmark(
         id="shire",
-        name_ru="Шир",
+        name_ru="The Shire",
         region=None,
         cost=("Face", "Fist", "Heart", "Heart", "Book", "Book"),
         effect="shire_play_visible",
@@ -89,7 +89,7 @@ LANDMARKS: list[Landmark] = [
     ),
     Landmark(
         id="grond",
-        name_ru="Гронд",
+        name_ru="Grond",
         region=None,  # region chosen dynamically (where the enemy fortress was)
         cost=("Face", "Face", "Fist", "Fist", "Heart", "Crown"),
         effect="grond_assault",

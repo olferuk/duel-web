@@ -13,13 +13,13 @@ this date trained with a phantom road into Mordor).
 # Neat 3-2-2 grid (rows y=9/26/43): reads like a diagram since we don't
 # draw the real map art anyway.
 REGIONS: list[dict] = [
-    {"key": "lindon", "name": "Линдон", "pos": (16, 9)},
-    {"key": "arnor", "name": "Арнор", "pos": (50, 9)},
-    {"key": "rhovanion", "name": "Рованион", "pos": (84, 9)},
-    {"key": "enedwaith", "name": "Энедвайт", "pos": (33, 26)},
-    {"key": "rohan", "name": "Рохан", "pos": (67, 26)},
-    {"key": "gondor", "name": "Гондор", "pos": (42, 43)},
-    {"key": "mordor", "name": "Мордор", "pos": (76, 43)},
+    {"key": "lindon", "name": "Lindon", "pos": (16, 9)},
+    {"key": "arnor", "name": "Arnor", "pos": (50, 9)},
+    {"key": "rhovanion", "name": "Rhovanion", "pos": (84, 9)},
+    {"key": "enedwaith", "name": "Enedwaith", "pos": (33, 26)},
+    {"key": "rohan", "name": "Rohan", "pos": (67, 26)},
+    {"key": "gondor", "name": "Gondor", "pos": (42, 43)},
+    {"key": "mordor", "name": "Mordor", "pos": (76, 43)},
 ]
 
 EDGES: list[tuple[str, str]] = [
@@ -39,10 +39,10 @@ EDGES: list[tuple[str, str]] = [
 ]
 
 RACES: list[dict] = [
-    {"key": "elves", "name": "Эльфы"},
-    {"key": "ents", "name": "Энты"},
-    {"key": "hobbits", "name": "Хоббиты"},
-    {"key": "humans", "name": "Люди"},
-    {"key": "dwarves", "name": "Гномы"},
-    {"key": "wizards", "name": "Волшебники"},
+    {"key": "elves", "name": "Elves"},
+    {"key": "ents", "name": "Ents"},
+    {"key": "hobbits", "name": "Hobbits"},
+    {"key": "humans", "name": "Humans"},
+    {"key": "dwarves", "name": "Dwarves"},
+    {"key": "wizards", "name": "Wizards"},
 ]

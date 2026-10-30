@@ -27,160 +27,160 @@ ALLIES: list[Ally] = [
     Ally(
         id="tom_bombadil",
         side=FELLOWSHIP,
-        name_ru="Том Бомбадил",
+        name_ru="Tom Bombadil",
         name_en="Tom Bombadil",
         enter_ru=(
-            "Положите использованный жетон Силы на назгула. Соперник должен "
-            "потратить 1 продвижение по треку Кольца, чтобы снять этот жетон, "
-            "прежде чем сможет двигаться по треку."
+            "Place a used Power token on the Nazgûl. Your opponent must "
+            "spend 1 Ring track step to remove this token "
+            "before they can move on the track."
         ),
         exit_ru=(
-            "Положите 2 использованных жетона Силы на назгула. Соперник тратит "
-            "по 1 продвижению за каждый жетон, прежде чем сможет двигаться."
+            "Place 2 used Power tokens on the Nazgûl. Your opponent spends "
+            "1 step per token before they can move."
         ),
     ),
     Ally(
         id="goldberry",
         side=FELLOWSHIP,
-        name_ru="Златеника",
+        name_ru="Goldberry",
         name_en="Goldberry",
-        enter_ru="Возьмите 3 монеты из запаса.",
-        exit_ru="Возьмите 5 монет из запаса И соперник теряет 2 монеты, если может.",
+        enter_ru="Take 3 coins from the supply.",
+        exit_ru="Take 5 coins from the supply AND your opponent loses 2 coins, if able.",
     ),
     Ally(
         id="boromir",
         side=FELLOWSHIP,
-        name_ru="Боромир",
+        name_ru="Boromir",
         name_en="Boromir",
-        enter_ru="Уберите 1 юнита соперника из любого региона.",
-        exit_ru="Уберите всех юнитов соперника из любого одного региона.",
+        enter_ru="Remove 1 enemy unit from any region.",
+        exit_ru="Remove all enemy units from any one region.",
     ),
     Ally(
         id="arwen",
         side=FELLOWSHIP,
-        name_ru="Арвен",
+        name_ru="Arwen",
         name_en="Arwen",
         enter_ru=(
-            "Возьмите случайную карту из сброса и сыграйте её без оплаты. "
-            "Рубашки видны — главу выбираете вы."
+            "Take a random card from the discard and play it for free. "
+            "Card backs are visible, so you choose the chapter."
         ),
-        exit_ru="Просмотрите сброс, выберите карту и сыграйте её без оплаты.",
+        exit_ru="Look through the discard, choose a card and play it for free.",
     ),
     Ally(
         id="elrond",
         side=FELLOWSHIP,
-        name_ru="Элронд",
+        name_ru="Elrond",
         name_en="Elrond",
         enter_ru=(
-            "Выберите расу из: Гномы, Люди, Эльфы, Хоббиты. Возьмите верхний "
-            "жетон Альянса этой расы — его эффект действует."
+            "Choose a race: Dwarves, Humans, Elves or Hobbits. Take the top "
+            "Alliance token of that race. Its effect applies."
         ),
         exit_ru=(
-            "Выберите расу из: Волшебники, Энты. Возьмите верхний жетон Альянса "
-            "этой расы — его эффект действует."
+            "Choose a race: Wizards or Ents. Take the top Alliance token "
+            "of that race. Its effect applies."
         ),
     ),
     Ally(
         id="faramir",
         side=FELLOWSHIP,
-        name_ru="Фарамир",
+        name_ru="Faramir",
         name_en="Faramir",
-        enter_ru="Сбросьте 1 доступную карту из центральной зоны.",
+        enter_ru="Discard 1 available card from the center.",
         exit_ru=(
-            "Сбросьте 1 доступную карту, раскройте ставшие доступными, затем "
-            "сбросьте ещё 1 доступную карту."
+            "Discard 1 available card, reveal any cards that become available, then "
+            "discard 1 more available card."
         ),
     ),
     Ally(
         id="lobelia",
         side=FELLOWSHIP,
-        name_ru="Лобелия Саквиль-Бэггинс",
+        name_ru="Lobelia Sackville-Baggins",
         name_en="Lobelia Sackville-Baggins",
-        enter_ru="Поставьте 1 юнита в любой регион и выполните 1 перемещение.",
+        enter_ru="Place 1 unit in any region and make 1 move.",
         exit_ru=(
-            "Поставьте 2 юнитов в один регион или по 1 юниту в два региона. "
-            "Также выполните 2 перемещения."
+            "Place 2 units in one region or 1 unit in each of two regions. "
+            "Also make 2 moves."
         ),
     ),
     # ---------- Саурон ----------
     Ally(
         id="witch_king",
         side=SAURON,
-        name_ru="Король-чародей",
+        name_ru="Witch-king",
         name_en="Witch-King",
-        enter_ru="Передвиньте назгула на 1 клетку ИЛИ поставьте 1 юнита в любой регион.",
-        exit_ru="Передвиньте назгула на 1 клетку И поставьте 1 юнита в любой регион.",
+        enter_ru="Move the Nazgûl 1 space OR place 1 unit in any region.",
+        exit_ru="Move the Nazgûl 1 space AND place 1 unit in any region.",
     ),
     Ally(
         id="shelob",
         side=SAURON,
-        name_ru="Шелоб",
+        name_ru="Shelob",
         name_en="Shelob",
         enter_ru=(
-            "Положите использованный жетон Силы на любую стопку жетонов Альянса. "
-            "До конца партии соперник не может брать оттуда и смотреть."
+            "Place a used Power token on any Alliance token stack. "
+            "For the rest of the game your opponent cannot draw from it or look at it."
         ),
-        exit_ru="Сбросьте 1 жетон Альянса из зоны соперника.",
+        exit_ru="Discard 1 Alliance token from your opponent's area.",
     ),
     Ally(
         id="uruk_hai_chief",
         side=SAURON,
-        name_ru="Вождь урук-хай",
+        name_ru="Uruk-hai Chief",
         name_en="Uruk-Hai Chief",
         enter_ru=(
-            "Положите использованный жетон Силы на доступный ориентир. "
-            "Соперник не может его взять."
+            "Place a used Power token on an available landmark. "
+            "Your opponent cannot take it."
         ),
-        exit_ru="Возьмите доступный ориентир и сыграйте его без оплаты.",
+        exit_ru="Take an available landmark and build it for free.",
     ),
     Ally(
         id="balrog",
         side=SAURON,
-        name_ru="Балрог",
+        name_ru="Balrog",
         name_en="Balrog",
         enter_ru=(
-            "Положите использованный жетон Силы на связь между двумя регионами. "
-            "Соперник больше не может по ней перемещаться."
+            "Place a used Power token on a link between two regions. "
+            "Your opponent can no longer move along it."
         ),
         exit_ru=(
-            "Примените enter-эффект одним из использованных жетонов И уберите, "
-            "если возможно, по 1 юниту соперника из обоих регионов этой связи."
+            "Apply the enter effect with one of the used tokens AND remove, "
+            "if possible, 1 enemy unit from both regions of that link."
         ),
     ),
     Ally(
         id="warg",
         side=SAURON,
-        name_ru="Варг",
+        name_ru="Warg",
         name_en="Warg",
         enter_ru=(
-            "Случайно выберите нераскрытую карту союзника соперника. Он немедленно "
-            "раскрывает её без траты жетона и без enter-эффекта (эффект потерян)."
+            "Pick a random unrevealed enemy ally. Your opponent reveals it at once "
+            "with no token spent and no enter effect (the effect is lost)."
         ),
         exit_ru=(
-            "Выберите раскрытую карту союзника соперника. Примените её exit-эффект "
-            "в свою пользу, не убирая карту (соперник всё ещё может её применить)."
+            "Choose a revealed enemy ally. Use its exit effect "
+            "for your benefit without removing the card (your opponent can still use it)."
         ),
     ),
     Ally(
         id="cave_troll",
         side=SAURON,
-        name_ru="Пещерный тролль",
+        name_ru="Cave Troll",
         name_en="Cave-Troll",
-        enter_ru="Сбросьте 1 серую карту из зоны соперника.",
-        exit_ru="Заберите 1 серую карту из зоны соперника в свою зону.",
+        enter_ru="Discard 1 grey card from your opponent's area.",
+        exit_ru="Move 1 grey card from your opponent's area to yours.",
     ),
     Ally(
         id="grima",
         side=SAURON,
-        name_ru="Грима",
+        name_ru="Gríma",
         name_en="Gríma",
         enter_ru=(
-            "Выберите доступную карту. Вместо своего хода соперник обязан взять её "
-            "и сыграть ИЛИ сбросить за монеты по номеру главы."
+            "Choose an available card. Instead of taking a turn, your opponent must take it "
+            "and play it OR discard it for coins equal to the chapter number."
         ),
         exit_ru=(
-            "Выберите доступную карту. Вместо своего хода соперник обязан взять её "
-            "и сбросить за монеты по номеру главы."
+            "Choose an available card. Instead of taking a turn, your opponent must take it "
+            "and discard it for coins equal to the chapter number."
         ),
     ),
 ]

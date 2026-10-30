@@ -54,23 +54,23 @@ def move_key(m: dict) -> tuple:
 
 
 FELLOWSHIP, SAURON = 0, 1
-SIDE_RU = ["Братство", "Саурон"]
+SIDE_RU = ["Fellowship", "Sauron"]
 UNITS_SUPPLY = 15
 RACES = ["elves", "ents", "hobbits", "humans", "dwarves", "wizards"]
 RACE_RU = {
-    "elves": "Эльфы",
-    "ents": "Энты",
-    "hobbits": "Хоббиты",
-    "humans": "Люди",
-    "dwarves": "Гномы",
-    "wizards": "Волшебники",
+    "elves": "Elves",
+    "ents": "Ents",
+    "hobbits": "Hobbits",
+    "humans": "Humans",
+    "dwarves": "Dwarves",
+    "wizards": "Wizards",
 }
 SKILL_RU = {
-    "Face": "Хитрость",
-    "Fist": "Сила",
-    "Heart": "Отвага",
-    "Crown": "Лидерство",
-    "Book": "Знание",
+    "Face": "Cunning",
+    "Fist": "Strength",
+    "Heart": "Courage",
+    "Crown": "Leadership",
+    "Book": "Knowledge",
 }
 
 
@@ -309,10 +309,10 @@ class Game:
             self._place_power_tokens()
         # режим партии — первой строкой лога: «а стояла ли галочка промо?»
         # должно быть видно и через час после старта
-        modes = ("Промо-тайлы: вкл." if promo else "") + (
-            " Дополнение «Союзники»: вкл." if allies else ""
+        modes = ("Promo tiles: on." if promo else "") + (
+            " Allies expansion: on." if allies else ""
         )
-        self.log: list[str] = [("Партия началась. Ходит Саурон. " + modes).rstrip()]
+        self.log: list[str] = [("Game started. Sauron moves first. " + modes).rstrip()]
 
     # ---------- DLC Allies: setup ----------
 
@@ -376,7 +376,7 @@ class Game:
             self.players[p].power += 1
             self.power_gained_turn[p] += 1
         if got:
-            self.log.append(f"{SIDE_RU[p]}: +{len(got)} жетон(ов) Силы с вскрытой карты")
+            self.log.append(f"{SIDE_RU[p]}: +{len(got)} Power token(s) from the revealed card")
 
     def _reveal_tableau(self, p: int) -> None:
         """Вскрыть ставшие доступными карты, начислив жетоны игроку `p`."""
@@ -541,22 +541,22 @@ class Game:
             if self.presence_count(p) == 7:
                 self.winner = p
                 self.win_reason = "conquest"
-                self.log.append(f"⚔️ {SIDE_RU[p]} покоряет Средиземье — победа!")
+                self.log.append(f"⚔️ {SIDE_RU[p]} conquers Middle-earth. Victory!")
 
     def _check_races(self, p: int) -> None:
         if self.winner is None and self.players[p].race_symbols_for_victory() >= 6:
             self.winner = p
             self.win_reason = "races"
-            self.log.append(f"🤝 {SIDE_RU[p]} заручился поддержкой 6 рас — победа!")
+            self.log.append(f"🤝 {SIDE_RU[p]} wins the support of 6 races. Victory!")
 
     def _place_units(self, p: int, region: str, n: int) -> None:
         if n > 0 and self.supply(p) == 0:
-            self.log.append(f"{SIDE_RU[p]}: запас юнитов пуст — размещение пропущено")
+            self.log.append(f"{SIDE_RU[p]}: no units left, placement skipped")
         n = min(n, self.supply(p))
         if n <= 0:
             return
         self.board_units[region][p] += n
-        self.log.append(f"{SIDE_RU[p]}: +{n} юнит(ов) в {REGION_RU[region]}")
+        self.log.append(f"{SIDE_RU[p]}: +{n} unit(s) in {REGION_RU[region]}")
         self._resolve_conflict(region)
         self._check_conquer()
 
@@ -566,7 +566,7 @@ class Game:
             k = min(u[0], u[1])
             u[0] -= k
             u[1] -= k
-            self.log.append(f"Конфликт в {REGION_RU[region]}: обе стороны теряют по {k}")
+            self.log.append(f"Conflict in {REGION_RU[region]}: each side loses {k}")
 
     def _advance_quest(self, p: int, steps: int) -> None:
         if self.winner is not None or steps <= 0:
@@ -580,28 +580,28 @@ class Game:
             self.power_retired += spent  # снятый жетон выбывает из игры
             steps -= spent
             self.log.append(
-                f"Том Бомбадил: {SIDE_RU[p]} снимает жетонов {spent},"
-                f" осталось {self.quest_locks[p]}"
+                f"Tom Bombadil: {SIDE_RU[p]} removes {spent} token(s),"
+                f" {self.quest_locks[p]} left"
             )
             if steps <= 0:
                 return
         bonuses = self.quest.advance(who, steps)
-        self.log.append(f"{SIDE_RU[p]}: +{steps} по Пути Кольца (разрыв {self.quest.gap})")
+        self.log.append(f"{SIDE_RU[p]}: +{steps} on the Ring Path (gap {self.quest.gap})")
         if self.quest.winner is not None:
             self.winner = FELLOWSHIP if self.quest.winner == "fellowship" else SAURON
             self.win_reason = "quest"
-            self.log.append(f"💍 {SIDE_RU[self.winner]} выигрывает гонку Кольца — победа!")
+            self.log.append(f"💍 {SIDE_RU[self.winner]} wins the Ring race. Victory!")
             return
         for b in bonuses:
             if b is Space.COIN:
                 got = self._gain_coins(p, 1)
-                self.log.append(f"Бонус трека: +{got} монета")
+                self.log.append(f"Track bonus: +{got} coin")
             elif b is Space.EXTRA_TURN:
                 # per the owner's ruling the extra turn is OPTIONAL.
                 # Спросим в самом конце хода (_settle): иначе игрок берёт доп. ход,
                 # а после него ему доигрывают оставшиеся эффекты карты — выглядит как баг.
                 self.extra_offers.append(p)
-                self.log.append("Бонус трека: право дополнительного хода")
+                self.log.append("Track bonus: extra turn available")
             elif b is Space.UNIT:
                 self.pending.append(
                     {
@@ -610,12 +610,12 @@ class Game:
                         "n": 1,
                         "regions": list(REGION_KEYS),
                         "optional": True,
-                        "why": "бонус трека",
+                        "why": "track bonus",
                     }
                 )
             elif b is Space.DESTROY_FORTRESS:
                 self.pending.append(
-                    {"type": "remove_fortress", "player": p, "optional": True, "why": "бонус трека"}
+                    {"type": "remove_fortress", "player": p, "optional": True, "why": "track bonus"}
                 )
 
     # ---------- automa helpers ----------
@@ -682,12 +682,12 @@ class Game:
             card = self.tableau.cards[sid]
             cost = self.card_cost(p, card)
             if cost["coins"] <= self.players[p].coins:
-                lbl = "по цепочке" if cost["chained"] else f"цена {cost['coins']}🪙"
+                lbl = "via chain" if cost["chained"] else f"cost {cost['coins']}🪙"
                 moves.append(
                     {
                         "type": "play",
                         "slot": sid,
-                        "label": f"Сыграть ({lbl})",
+                        "label": f"Play ({lbl})",
                         "cost": cost["coins"],
                         "chained": cost["chained"],
                     }
@@ -697,7 +697,7 @@ class Game:
                     2 if "humans_double_discard" in self.players[p].tokens else 1
                 )
                 moves.append(
-                    {"type": "discard", "slot": sid, "label": f"Сбросить (+{gain}🪙)", "gain": gain}
+                    {"type": "discard", "slot": sid, "label": f"Discard (+{gain}🪙)", "gain": gain}
                 )
         for lm_id in self.landmarks_faceup:
             if not self._landmark_open(lm_id, p):
@@ -732,7 +732,7 @@ class Game:
                     {
                         "type": "ally_enter",
                         "ally": aid,
-                        "label": f"{ALLY_BY_ID[aid].name_ru}: призыв (1 жетон)",
+                        "label": f"{ALLY_BY_ID[aid].name_ru}: summon (1 token)",
                     }
                 )
         if pl.power >= 2:
@@ -741,7 +741,7 @@ class Game:
                     {
                         "type": "ally_exit",
                         "ally": aid,
-                        "label": f"{ALLY_BY_ID[aid].name_ru}: прощание (2 жетона)",
+                        "label": f"{ALLY_BY_ID[aid].name_ru}: farewell (2 tokens)",
                     }
                 )
         return moves
@@ -764,12 +764,12 @@ class Game:
         if ft["mode"] == "play_or_discard":
             cost = self.card_cost(p, card)
             if cost["coins"] <= self.players[p].coins:
-                lbl = "по цепочке" if cost["chained"] else f"цена {cost['coins']}🪙"
+                lbl = "via chain" if cost["chained"] else f"cost {cost['coins']}🪙"
                 moves.append(
                     {
                         "type": "play",
                         "slot": sid,
-                        "label": f"Грима велит: сыграть ({lbl})",
+                        "label": f"Gríma commands: play ({lbl})",
                         "cost": cost["coins"],
                         "chained": cost["chained"],
                     }
@@ -778,7 +778,7 @@ class Game:
             {
                 "type": "discard",
                 "slot": sid,
-                "label": f"Грима велит: сбросить (+{gain}🪙)",
+                "label": f"Gríma commands: discard (+{gain}🪙)",
                 "gain": gain,
             }
         )
@@ -791,7 +791,7 @@ class Game:
         if t == "place_units":
             for r in pd["regions"]:
                 moves.append(
-                    {"type": "place", "region": r, "label": f"{pd['n']} юнит(ов) → {REGION_RU[r]}"}
+                    {"type": "place", "region": r, "label": f"{pd['n']} unit(s) → {REGION_RU[r]}"}
                 )
         elif t == "movements":
             for src in REGION_KEYS:
@@ -804,12 +804,12 @@ class Game:
                                 "type": "move",
                                 "from": src,
                                 "to": dst,
-                                "label": f"Юнит: {REGION_RU[src]} → {REGION_RU[dst]}",
+                                "label": f"Unit: {REGION_RU[src]} → {REGION_RU[dst]}",
                             }
                         )
         elif t == "extra_turn_offer":
-            moves.append({"type": "extra", "take": 1, "label": "🔄 Сходить ещё раз"})
-            moves.append({"type": "extra", "take": 0, "label": "Передать ход противнику"})
+            moves.append({"type": "extra", "take": 1, "label": "🔄 Take another turn"})
+            moves.append({"type": "extra", "take": 0, "label": "Pass the turn"})
         elif t == "casualties":
             opp = 1 - p
             for r in REGION_KEYS:
@@ -818,7 +818,7 @@ class Game:
                         {
                             "type": "kill",
                             "region": r,
-                            "label": f"Убрать юнита врага: {REGION_RU[r]}",
+                            "label": f"Remove enemy unit: {REGION_RU[r]}",
                         }
                     )
         elif t == "remove_fortress":
@@ -829,7 +829,7 @@ class Game:
                         {
                             "type": "raze",
                             "region": r,
-                            "label": f"Снести крепость врага: {REGION_RU[r]}",
+                            "label": f"Destroy enemy fortress: {REGION_RU[r]}",
                         }
                     )
         elif t == "choose_token":
@@ -865,7 +865,7 @@ class Game:
                         {
                             "type": "strip_grey",
                             "index": i,
-                            "label": f"Снять у врага: {card_label(c)}",
+                            "label": f"Take from enemy: {card_label(c)}",
                         }
                     )
         elif t == "shire_play":
@@ -890,17 +890,17 @@ class Game:
         elif t == "grond_retreat":
             for dst in sorted(ADJ[pd["region"]]):
                 moves.append(
-                    {"type": "retreat", "to": dst, "label": f"Отступление в {REGION_RU[dst]}"}
+                    {"type": "retreat", "to": dst, "label": f"Retreat to {REGION_RU[dst]}"}
                 )
         elif t == "ents_menu":
             opp = 1 - p
             for r in REGION_KEYS:
                 if self.board_units[r][opp] > 0:
                     moves.append(
-                        {"type": "ents_kill", "region": r, "label": f"Убрать юнита: {REGION_RU[r]}"}
+                        {"type": "ents_kill", "region": r, "label": f"Remove unit: {REGION_RU[r]}"}
                     )
             if self.players[opp].coins > 0:
-                moves.append({"type": "ents_coin", "label": "Враг теряет 1 монету"})
+                moves.append({"type": "ents_coin", "label": "Enemy loses 1 coin"})
             for src in REGION_KEYS:
                 if self.board_units[src][p] > 0:
                     for dst in sorted(ADJ[src]):
@@ -911,7 +911,7 @@ class Game:
                                 "type": "ents_move",
                                 "from": src,
                                 "to": dst,
-                                "label": f"Юнит: {REGION_RU[src]} → {REGION_RU[dst]}",
+                                "label": f"Unit: {REGION_RU[src]} → {REGION_RU[dst]}",
                             }
                         )
         elif t == "ally_offer":
@@ -924,12 +924,12 @@ class Game:
                         {
                             "type": "kill_all",
                             "region": r,
-                            "label": f"Убрать всех: {REGION_RU[r]} ({self.board_units[r][opp]})",
+                            "label": f"Remove all: {REGION_RU[r]} ({self.board_units[r][opp]})",
                         }
                     )
         elif t == "arwen_chapter":
             for ch in sorted({c.chapter for c in self.discard_open}):
-                moves.append({"type": "arwen_pick", "chapter": ch, "label": f"Глава {ch}"})
+                moves.append({"type": "arwen_pick", "chapter": ch, "label": f"Chapter {ch}"})
         elif t == "elrond_race":
             for race in pd["races"]:
                 if self.alliance_stacks[race] and self._stack_open(race, p):
@@ -940,18 +940,18 @@ class Game:
                     {
                         "type": "faramir_pick",
                         "slot": sid,
-                        "label": f"Сбросить: {self._slot_label(sid)}",
+                        "label": f"Discard: {self._slot_label(sid)}",
                     }
                 )
         elif t == "witch_king_choice":
-            moves.append({"type": "wk_quest", "label": "Назгул: 1 шаг по треку"})
+            moves.append({"type": "wk_quest", "label": "Nazgûl: 1 step on the track"})
             for r in REGION_KEYS:
-                moves.append({"type": "wk_unit", "region": r, "label": f"Юнит → {REGION_RU[r]}"})
+                moves.append({"type": "wk_unit", "region": r, "label": f"Unit → {REGION_RU[r]}"})
         elif t == "lock_stack":
             for race in RACES:
                 if race not in self.locked_stacks and self.alliance_stacks[race]:
                     moves.append(
-                        {"type": "lock_race", "race": race, "label": f"Запереть: {RACE_RU[race]}"}
+                        {"type": "lock_race", "race": race, "label": f"Lock: {RACE_RU[race]}"}
                     )
         elif t == "discard_opp_token":
             for i, tok in enumerate(self.players[1 - p].tokens):
@@ -959,7 +959,7 @@ class Game:
                     {
                         "type": "drop_token",
                         "index": i,
-                        "label": f"Снять жетон: {TOKEN_BY_ID[tok].text_ru}",
+                        "label": f"Remove token: {TOKEN_BY_ID[tok].text_ru}",
                     }
                 )
         elif t == "lock_landmark":
@@ -969,7 +969,7 @@ class Game:
                         {
                             "type": "lock_tile",
                             "tile": lm_id,
-                            "label": f"Запереть: {LM_BY_ID[lm_id].name_ru}",
+                            "label": f"Lock: {LM_BY_ID[lm_id].name_ru}",
                         }
                     )
         elif t == "take_landmark_free":
@@ -979,7 +979,7 @@ class Game:
                         {
                             "type": "free_tile",
                             "tile": lm_id,
-                            "label": f"{LM_BY_ID[lm_id].name_ru} (бесплатно)",
+                            "label": f"{LM_BY_ID[lm_id].name_ru} (free)",
                         }
                     )
         elif t == "lock_edge":
@@ -990,7 +990,7 @@ class Game:
                         {
                             "type": "lock_link",
                             "edge": key,
-                            "label": f"Перекрыть: {REGION_RU[a]} ↔ {REGION_RU[b]}",
+                            "label": f"Block: {REGION_RU[a]} ↔ {REGION_RU[b]}",
                         }
                     )
         elif t == "choose_opp_ally":
@@ -999,7 +999,7 @@ class Game:
                     {
                         "type": "steal_exit",
                         "ally": aid,
-                        "label": f"Прощание {ALLY_BY_ID[aid].name_ru} — в свою пользу",
+                        "label": f"{ALLY_BY_ID[aid].name_ru} farewell, for your benefit",
                     }
                 )
         elif t == "steal_opp_grey":
@@ -1007,7 +1007,7 @@ class Game:
             for i, c in enumerate(self.players[opp].played):
                 if c.type is CardType.GREY:
                     moves.append(
-                        {"type": "grab_grey", "index": i, "label": f"Забрать: {card_label(c)}"}
+                        {"type": "grab_grey", "index": i, "label": f"Take: {card_label(c)}"}
                     )
         elif t == "grima_pick":
             for sid in self.tableau.available():
@@ -1015,13 +1015,13 @@ class Game:
                     {
                         "type": "grima_target",
                         "slot": sid,
-                        "label": f"Навязать: {self._slot_label(sid)}",
+                        "label": f"Force: {self._slot_label(sid)}",
                     }
                 )
         if pd.get("optional") or t in ("movements", "casualties", "ents_menu"):
-            moves.append({"type": "skip", "label": "Пропустить"})
+            moves.append({"type": "skip", "label": "Skip"})
         if not moves:
-            moves.append({"type": "skip", "label": "Пропустить (нет вариантов)"})
+            moves.append({"type": "skip", "label": "Skip (no options)"})
         return moves
 
     # ---------- apply ----------
@@ -1045,18 +1045,18 @@ class Game:
             self.players[p].add_card(card)
             chained = cost["chained"]
             if chained:
-                how = " по цепочке"
+                how = " via chain"
             elif self.is_automa(p):
-                how = " (автома — бесплатно)"
+                how = " (automa, free)"
             else:
-                how = f" за {cost['coins']}🪙"
-            msg = f"Ход {self.turn_no} — {SIDE_RU[p]} играет {card_label(card)}" + how
+                how = f" for {cost['coins']}🪙"
+            msg = f"Turn {self.turn_no} — {SIDE_RU[p]} plays {card_label(card)}" + how
             self.log.append(msg)
             self.last_action[p] = msg
             self.turn_no += 1
             if chained and "hobbits_chain_coins" in self.players[p].tokens:
                 got = self._gain_coins(p, 3)
-                self.log.append(f"Хоббиты: +{got}🪙 за цепочку")
+                self.log.append(f"Hobbits: +{got}🪙 for the chain")
             self._card_effects(p, card)
         elif t == "discard":
             self.forced_take = None
@@ -1065,7 +1065,7 @@ class Game:
             self.discard_open.append(card)
             mult = 2 if "humans_double_discard" in self.players[p].tokens else 1
             got = self._gain_coins(p, self.rules["discard_payout"][self.chapter - 1] * mult)
-            msg = f"Ход {self.turn_no} — {SIDE_RU[p]} сбрасывает карту (+{got}🪙)"
+            msg = f"Turn {self.turn_no} — {SIDE_RU[p]} discards a card (+{got}🪙)"
             self.log.append(msg)
             self.last_action[p] = msg
             self.turn_no += 1
@@ -1078,14 +1078,14 @@ class Game:
             if self.locked_landmarks.pop(lm.id, None) is not None:
                 self.power_retired += 1  # владелец забрал свой же запертый ориентир
             self.players[p].landmarks.append(lm.id)
-            msg = f"Ход {self.turn_no} — {SIDE_RU[p]} возводит {lm.name_ru} за {cost['coins']}🪙"
+            msg = f"Turn {self.turn_no} — {SIDE_RU[p]} builds {lm.name_ru} for {cost['coins']}🪙"
             self.log.append(msg)
             self.last_action[p] = msg
             self.turn_no += 1
             self._tile_effects(p, lm)
             if "dwarves_tile_turn" in self.players[p].tokens:
                 self.extra_turns += 1
-                self.log.append("Гномы: дополнительный ход")
+                self.log.append("Dwarves: extra turn")
         else:
             raise ValueError(f"bad move {move}")
         self._settle()
@@ -1110,7 +1110,7 @@ class Game:
             # Призыв съел последнюю возможность (Фарамир сбросил единственную
             # доступную карту без вскрытия, монет на ориентир нет, жетонов нет):
             # состояние без единого хода ломает поиск — ход просто переходит.
-            self.log.append(f"{SIDE_RU[self.current]}: после призыва ходов нет — ход переходит")
+            self.log.append(f"{SIDE_RU[self.current]}: no moves after the summon, turn passes")
             self.turn_action_done = True
         if (
             self.allies
@@ -1136,7 +1136,7 @@ class Game:
                 {
                     "type": "extra_turn_offer",
                     "player": self.extra_offers.pop(0),
-                    "why": "бонус трека — дополнительный ход",
+                    "why": "track bonus: extra turn",
                 }
             )
             return
@@ -1156,14 +1156,14 @@ class Game:
             self._place_power_tokens()
             while len(self.landmarks_faceup) < 3 and self.landmarks_deck:
                 self.landmarks_faceup.append(self.landmarks_deck.pop())
-            self.log.append(f"— Эпоха {self.chapter} —")
+            self.log.append(f"— Chapter {self.chapter} —")
         self.turn_action_done = False
         self.ally_called = False
         self.ally_offered = False
         self.power_gained_turn = [0, 0]
         if self.extra_turns > 0:
             self.extra_turns -= 1
-            self.log.append(f"{SIDE_RU[self.current]} ходит ещё раз")
+            self.log.append(f"{SIDE_RU[self.current]} takes another turn")
         else:
             self.current = 1 - self.current
 
@@ -1176,8 +1176,8 @@ class Game:
         else:
             self.winner = "draw"
         self.win_reason = "presence"
-        who = "ничья" if self.winner == "draw" else f"победа: {SIDE_RU[self.winner]}"
-        self.log.append(f"Конец 3-й эпохи. Присутствие {a}:{b} — {who}.")
+        who = "draw" if self.winner == "draw" else f"winner: {SIDE_RU[self.winner]}"
+        self.log.append(f"End of Chapter 3. Presence {a}:{b} — {who}.")
 
     # ---------- card effects ----------
 
@@ -1186,7 +1186,7 @@ class Game:
         # сила Тома Бомбадила / Похлёбки Эовин: +3🪙 за карту с символом цепочки
         if self._apower(p, "chain_coins3") and card.takes_link:
             got = self._gain_coins(p, 3)
-            self.log.append(f"Сила персонажа: +{got}🪙 за символ цепочки")
+            self.log.append(f"Character power: +{got}🪙 for the chain symbol")
         if card.type is CardType.YELLOW:
             got = self._gain_coins(p, card.coins)
             self.log.append(f"+{got}🪙")
@@ -1194,7 +1194,7 @@ class Game:
                 self._advance_quest(p, 1)
             if "elves_extra_turn" in toks:
                 self.extra_turns += 1
-                self.log.append("Эльфы: дополнительный ход")
+                self.log.append("Elves: extra turn")
         elif card.type is CardType.BLUE:
             self._advance_quest(p, card.quest_steps)
             if (
@@ -1207,7 +1207,7 @@ class Game:
                         "n": 1,
                         "regions": list(REGION_KEYS),
                         "optional": True,
-                        "why": "Хоббиты" if "hobbits_blue_unit" in toks else "сила персонажа",
+                        "why": "Hobbits" if "hobbits_blue_unit" in toks else "character power",
                     }
                 )
         elif card.type is CardType.RED:
@@ -1228,7 +1228,7 @@ class Game:
                 lost = min(card.opp_coins_lost, self.players[1 - p].coins)
                 self.players[1 - p].coins -= lost
                 self.reserve += lost
-                self.log.append(f"{SIDE_RU[1 - p]} теряет {lost}🪙")
+                self.log.append(f"{SIDE_RU[1 - p]} loses {lost}🪙")
             if card.casualties:
                 combo = bool(card.movements)
                 self.pending.append(
@@ -1253,7 +1253,7 @@ class Game:
                     "player": p,
                     "options": list(top2),
                     "source": {"race": race, "count": len(top2)},
-                    "why": f"2 символа: {RACE_RU[race]}",
+                    "why": f"2 symbols: {RACE_RU[race]}",
                 }
             )
         if not player.used_three_diff and len(counts) >= 3:
@@ -1271,7 +1271,7 @@ class Game:
                         "player": p,
                         "options": options,
                         "source": {"three_diff": True},
-                        "why": "3 разных расы",
+                        "why": "3 different races",
                     }
                 )
 
@@ -1280,7 +1280,7 @@ class Game:
     def _tile_effects(self, p: int, lm: Landmark) -> None:
         if lm.region:
             self.board_forts[lm.region][p] += 1
-            self.log.append(f"Крепость в {REGION_RU[lm.region]}")
+            self.log.append(f"Fortress in {REGION_RU[lm.region]}")
             self._check_conquer()
             if lm.units:
                 self._place_units(p, lm.region, lm.units)
@@ -1320,11 +1320,11 @@ class Game:
         if enter:
             pl.ally_hand.remove(aid)
             pl.ally_open.append(aid)
-            self.log.append(f"{SIDE_RU[p]} призывает союзника: {ally.name_ru}")
+            self.log.append(f"{SIDE_RU[p]} summons an ally: {ally.name_ru}")
         else:
             pl.ally_open.remove(aid)
             pl.ally_gone.append(aid)
-            self.log.append(f"{SIDE_RU[p]} прощается с союзником: {ally.name_ru}")
+            self.log.append(f"{SIDE_RU[p]} bids farewell to an ally: {ally.name_ru}")
         self.ally_called = True
         self._ally_effect(p, aid, "enter" if enter else "exit")
 
@@ -1332,7 +1332,7 @@ class Game:
         """Подпись карты раскладки для меню выбора: «слот 12» игроку ничего не говорит."""
         if sid in self.tableau.revealed:
             return card_label(self.tableau.cards[sid])
-        return f"закрытая карта (слот {sid})"
+        return f"face-down card (slot {sid})"
 
     def _stack_open(self, race: str, p: int) -> bool:
         """Доступна ли стопка Альянса игроку `p` (Шелоб запирает её сопернику)."""
@@ -1380,16 +1380,16 @@ class Game:
             self.quest_locks[opp] += n
             self._put_token_on_board(n)
             self.log.append(
-                f"Том Бомбадил: {SIDE_RU[opp]} должен снять {self.quest_locks[opp]}"
-                " жетон(ов), прежде чем двигаться по треку"
+                f"Tom Bombadil: {SIDE_RU[opp]} must remove {self.quest_locks[opp]}"
+                " token(s) before moving on the track"
             )
         elif aid == "goldberry":
             got = self._gain_coins(p, 3 if enter else 5)
-            self.log.append(f"Златеника: +{got}🪙")
+            self.log.append(f"Goldberry: +{got}🪙")
             if not enter:
                 lost = self._lose_coins(opp, 2)
                 if lost:
-                    self.log.append(f"Златеника: {SIDE_RU[opp]} теряет {lost}🪙")
+                    self.log.append(f"Goldberry: {SIDE_RU[opp]} loses {lost}🪙")
         elif aid == "boromir":
             self._q({"type": "casualties" if enter else "kill_region_all", "player": p, "n": 1})
         elif aid == "arwen":
@@ -1416,7 +1416,7 @@ class Game:
                         "player": p,
                         "n": 1,
                         "regions": list(REGION_KEYS),
-                        "why": "Лобелия",
+                        "why": "Lobelia",
                     }
                 )
             self._q({"type": "movements", "player": p, "n": n})
@@ -1434,7 +1434,7 @@ class Game:
                             "player": p,
                             "n": 1,
                             "regions": list(REGION_KEYS),
-                            "why": "Король-чародей",
+                            "why": "Witch-king",
                         }
                     )
         elif aid == "shelob":
@@ -1454,11 +1454,11 @@ class Game:
                     hand.remove(victim)
                     self.players[opp].ally_open.append(victim)
                     self.log.append(
-                        f"Варг: у {SIDE_RU[opp]} раскрыт {ALLY_BY_ID[victim].name_ru}"
-                        " — enter-эффект потерян"
+                        f"Warg: {SIDE_RU[opp]} reveals {ALLY_BY_ID[victim].name_ru}"
+                        ", enter effect lost"
                     )
                 else:
-                    self.log.append("Варг: у соперника нет нераскрытых союзников")
+                    self.log.append("Warg: the opponent has no unrevealed allies")
             else:
                 self._q({"type": "choose_opp_ally", "player": p})
         elif aid == "cave_troll":
@@ -1478,7 +1478,7 @@ class Game:
 
     def _gain_token(self, p: int, token_id: str) -> None:
         tk = TOKEN_BY_ID[token_id]
-        self.log.append(f"{SIDE_RU[p]} получает жетон: {RACE_RU[tk.race]} — {tk.text_ru}")
+        self.log.append(f"{SIDE_RU[p]} gains a token: {RACE_RU[tk.race]} — {tk.text_ru}")
         # instant tokens resolve once but stay on display in the player panel;
         # no effect code ever queries instant ids, so keeping them is safe
         self.players[p].tokens.append(token_id)
@@ -1492,7 +1492,7 @@ class Game:
                 and not self._apower(p, "chain_coins3")
             ):
                 got = self._gain_coins(p, 3)
-                self.log.append(f"Автома: +{got}🪙 разово за жетон хоббитов")
+                self.log.append(f"Automa: one-time +{got}🪙 for the Hobbits token")
             self._check_races(p)
             return
         if token_id == "ents_extra_turn":
@@ -1512,7 +1512,7 @@ class Game:
                         "n": 1,
                         "regions": list(REGION_KEYS),
                         "optional": True,
-                        "why": "Волшебники",
+                        "why": "Wizards",
                     }
                 )
         elif token_id == "wizards_discard_play":
@@ -1541,7 +1541,7 @@ class Game:
             r = move["region"]
             n = self.board_units[r][1 - p]
             self.board_units[r][1 - p] = 0
-            self.log.append(f"Боромир: {SIDE_RU[1 - p]} теряет {n} юнит(ов) в {REGION_RU[r]}")
+            self.log.append(f"Boromir: {SIDE_RU[1 - p]} loses {n} unit(s) in {REGION_RU[r]}")
             self._check_conquer()
         elif pd["type"] == "arwen_chapter":
             self.pending.pop(0)
@@ -1549,20 +1549,20 @@ class Game:
             idx = self.rng.choice(pool)
             card = self.discard_open.pop(idx)
             self.players[p].add_card(card)
-            self.log.append(f"Арвен: наугад из сброса — {card_label(card)} (бесплатно)")
+            self.log.append(f"Arwen: random card from the discard: {card_label(card)} (free)")
             self._card_effects(p, card)
         elif pd["type"] == "elrond_race":
             self.pending.pop(0)
             race = move["race"]
             tok = self.alliance_stacks[race].pop(0)
-            self.log.append(f"Элронд: верхний жетон расы {RACE_RU[race]}")
+            self.log.append(f"Elrond: top {RACE_RU[race]} token")
             self._gain_token(p, tok)
         elif pd["type"] == "faramir_discard":
             self.pending.pop(0)
             card = self._take_slot(p, move["slot"], reveal=pd.get("reveal", True))
             self.discard_open.append(card)
             # монет за этот сброс НЕ даётся (примечание правил)
-            self.log.append(f"Фарамир: сброшена карта из центра — {card_label(card)}")
+            self.log.append(f"Faramir: discarded from the center: {card_label(card)}")
         elif pd["type"] == "witch_king_choice":
             self.pending.pop(0)
             if t == "wk_quest":
@@ -1574,17 +1574,17 @@ class Game:
             race = move["race"]
             self.locked_stacks[race] = p
             self._put_token_on_board()
-            self.log.append(f"Шелоб: стопка {RACE_RU[race]} закрыта для {SIDE_RU[1 - p]}")
+            self.log.append(f"Shelob: {RACE_RU[race]} stack closed to {SIDE_RU[1 - p]}")
         elif pd["type"] == "discard_opp_token":
             self.pending.pop(0)
             tok = self.players[1 - p].tokens.pop(move["index"])
-            self.log.append(f"Шелоб: у {SIDE_RU[1 - p]} снят жетон {TOKEN_BY_ID[tok].text_ru}")
+            self.log.append(f"Shelob: {SIDE_RU[1 - p]} loses a token: {TOKEN_BY_ID[tok].text_ru}")
         elif pd["type"] == "lock_landmark":
             self.pending.pop(0)
             self.locked_landmarks[move["tile"]] = p
             self._put_token_on_board()
             self.log.append(
-                f"Вождь урук-хай: {LM_BY_ID[move['tile']].name_ru} закрыт для {SIDE_RU[1 - p]}"
+                f"Uruk-hai Chief: {LM_BY_ID[move['tile']].name_ru} closed to {SIDE_RU[1 - p]}"
             )
         elif pd["type"] == "take_landmark_free":
             self.pending.pop(0)
@@ -1593,7 +1593,7 @@ class Game:
             if self.locked_landmarks.pop(lm.id, None) is not None:
                 self.power_retired += 1  # владелец забрал свой же запертый ориентир
             self.players[p].landmarks.append(lm.id)
-            self.log.append(f"Вождь урук-хай: {SIDE_RU[p]} возводит {lm.name_ru} бесплатно")
+            self.log.append(f"Uruk-hai Chief: {SIDE_RU[p]} builds {lm.name_ru} for free")
             self._tile_effects(p, lm)
         elif pd["type"] == "lock_edge":
             self.pending.pop(0)
@@ -1602,38 +1602,38 @@ class Game:
             self._put_token_on_board()
             a, b = key.split("|")
             self.log.append(
-                f"Балрог: связь {REGION_RU[a]} ↔ {REGION_RU[b]} закрыта для {SIDE_RU[1 - p]}"
+                f"Balrog: link {REGION_RU[a]} ↔ {REGION_RU[b]} closed to {SIDE_RU[1 - p]}"
             )
             if pd.get("kill"):
                 for r in (a, b):
                     if self.board_units[r][1 - p] > 0:
                         self.board_units[r][1 - p] -= 1
-                        self.log.append(f"Балрог: {SIDE_RU[1 - p]} теряет юнита в {REGION_RU[r]}")
+                        self.log.append(f"Balrog: {SIDE_RU[1 - p]} loses a unit in {REGION_RU[r]}")
                 self._check_conquer()
         elif pd["type"] == "choose_opp_ally":
             self.pending.pop(0)
             aid = move["ally"]
             self.log.append(
-                f"Варг: {SIDE_RU[p]} применяет прощание {ALLY_BY_ID[aid].name_ru} в свою пользу"
+                f"Warg: {SIDE_RU[p]} uses the {ALLY_BY_ID[aid].name_ru} farewell"
             )
             self._ally_effect(p, aid, "exit")
         elif pd["type"] == "steal_opp_grey":
             self.pending.pop(0)
             card = self.players[1 - p].remove_card(move["index"])
             self.players[p].add_card(card)
-            self.log.append(f"Пещерный тролль: {SIDE_RU[p]} забирает {card_label(card)}")
+            self.log.append(f"Cave Troll: {SIDE_RU[p]} takes {card_label(card)}")
             self._check_races(p)
         elif pd["type"] == "grima_pick":
             self.pending.pop(0)
             self.forced_take = {"player": 1 - p, "slot": move["slot"], "mode": pd["mode"]}
-            self.log.append(f"Грима навязывает {SIDE_RU[1 - p]} карту из центра")
+            self.log.append(f"Gríma forces a center card on {SIDE_RU[1 - p]}")
         elif pd["type"] == "extra_turn_offer":
             self.pending.pop(0)
             if move.get("take"):
                 self.extra_turns += 1
-                self.log.append(f"{SIDE_RU[p]} использует дополнительный ход")
+                self.log.append(f"{SIDE_RU[p]} takes the extra turn")
             else:
-                self.log.append(f"{SIDE_RU[p]} отказывается от дополнительного хода")
+                self.log.append(f"{SIDE_RU[p]} declines the extra turn")
         elif pd["type"] == "place_units":
             self.pending.pop(0)
             self._place_units(p, move["region"], pd["n"])
@@ -1641,7 +1641,7 @@ class Game:
             self.board_units[move["from"]][p] -= 1
             self.board_units[move["to"]][p] += 1
             self.log.append(
-                f"{SIDE_RU[p]}: юнит {REGION_RU[move['from']]} → {REGION_RU[move['to']]}"
+                f"{SIDE_RU[p]}: unit {REGION_RU[move['from']]} → {REGION_RU[move['to']]}"
             )
             self._resolve_conflict(move["to"])
             self._check_conquer()
@@ -1650,7 +1650,7 @@ class Game:
                 self.pending.pop(0)
         elif pd["type"] == "casualties":
             self.board_units[move["region"]][1 - p] -= 1
-            self.log.append(f"{SIDE_RU[1 - p]} теряет юнита в {REGION_RU[move['region']]}")
+            self.log.append(f"{SIDE_RU[1 - p]} loses a unit in {REGION_RU[move['region']]}")
             self._check_conquer()
             pd["n"] -= 1
             if pd["n"] <= 0:
@@ -1658,7 +1658,7 @@ class Game:
         elif pd["type"] == "remove_fortress":
             self.pending.pop(0)
             self.board_forts[move["region"]][1 - p] -= 1
-            self.log.append(f"Крепость {SIDE_RU[1 - p]} в {REGION_RU[move['region']]} снесена")
+            self.log.append(f"{SIDE_RU[1 - p]} fortress in {REGION_RU[move['region']]} destroyed")
             self._check_conquer()
         elif pd["type"] == "choose_token":
             self.pending.pop(0)
@@ -1684,33 +1684,35 @@ class Game:
                     "player": p,
                     "options": list(top2),
                     "source": {"race": race},
-                    "why": f"Серые Гавани: {RACE_RU[race]}",
+                    "why": f"Grey Havens: {RACE_RU[race]}",
                 },
             )
         elif pd["type"] == "play_from_discard":
             self.pending.pop(0)
             card = self.discard_open.pop(move["index"])
             self.players[p].add_card(card)
-            self.log.append(f"{SIDE_RU[p]} играет из сброса {card_label(card)} (бесплатно)")
+            self.log.append(f"{SIDE_RU[p]} plays {card_label(card)} from the discard (free)")
             self._card_effects(p, card)
         elif pd["type"] == "discard_opp_grey":
             self.pending.pop(0)
             card = self.players[1 - p].remove_card(move["index"])
             self.discard_open.append(card)
-            self.log.append(f"Изенгард: у {SIDE_RU[1 - p]} снята {card_label(card)}")
+            self.log.append(f"Isengard: {SIDE_RU[1 - p]} loses {card_label(card)}")
         elif pd["type"] == "shire_play":
             self.pending.pop(0)
             card = self._take_slot(p, move["slot"], any_=True)
             cost = self.card_cost(p, card)
             self._pay_coins(p, cost["coins"])
             self.players[p].add_card(card)
-            self.log.append(f"Шир: {SIDE_RU[p]} играет {card_label(card)} за {cost['coins']}🪙")
+            self.log.append(
+                f"The Shire: {SIDE_RU[p]} plays {card_label(card)} for {cost['coins']}🪙"
+            )
             self._card_effects(p, card)
         elif pd["type"] == "grond_pick":
             self.pending.pop(0)
             region = move["region"]
             self.board_forts[region][1 - p] -= 1
-            self.log.append(f"Гронд: крепость {SIDE_RU[1 - p]} в {REGION_RU[region]} разрушена")
+            self.log.append(f"Grond: {SIDE_RU[1 - p]} fortress in {REGION_RU[region]} destroyed")
             enemies = self.board_units[region][1 - p]
             if enemies > 0:
                 self.pending.insert(
@@ -1723,25 +1725,25 @@ class Game:
             region, dst, k = pd["region"], move["to"], pd["count"]
             self.board_units[region][1 - p] -= k
             self.board_units[dst][1 - p] += k
-            self.log.append(f"Гронд: {k} юнит(ов) {SIDE_RU[1 - p]} отступают в {REGION_RU[dst]}")
+            self.log.append(f"Grond: {k} {SIDE_RU[1 - p]} unit(s) retreat to {REGION_RU[dst]}")
             self._resolve_conflict(dst)
             self._grond_finish(p, pd["region"])
         elif pd["type"] == "ents_menu":
             if t == "ents_kill":
                 self.board_units[move["region"]][1 - p] -= 1
                 self.log.append(
-                    f"Энты: {SIDE_RU[1 - p]} теряет юнита в {REGION_RU[move['region']]}"
+                    f"Ents: {SIDE_RU[1 - p]} loses a unit in {REGION_RU[move['region']]}"
                 )
             elif t == "ents_coin":
                 lost = min(1, self.players[1 - p].coins)
                 self.players[1 - p].coins -= lost
                 self.reserve += lost
-                self.log.append(f"Энты: {SIDE_RU[1 - p]} теряет {lost}🪙")
+                self.log.append(f"Ents: {SIDE_RU[1 - p]} loses {lost}🪙")
             elif t == "ents_move":
                 self.board_units[move["from"]][p] -= 1
                 self.board_units[move["to"]][p] += 1
                 self._resolve_conflict(move["to"])
-                self.log.append(f"Энты: юнит {REGION_RU[move['from']]} → {REGION_RU[move['to']]}")
+                self.log.append(f"Ents: unit {REGION_RU[move['from']]} → {REGION_RU[move['to']]}")
             self._check_conquer()
             pd["n"] -= 1
             if pd["n"] <= 0:
@@ -1751,7 +1753,7 @@ class Game:
 
     def _grond_finish(self, p: int, region: str) -> None:
         self.board_forts[region][p] += 1
-        self.log.append(f"Гронд: крепость {SIDE_RU[p]} в {REGION_RU[region]}")
+        self.log.append(f"Grond: {SIDE_RU[p]} fortress in {REGION_RU[region]}")
         self._place_units(p, region, 1)
         self._check_conquer()
 
@@ -1853,16 +1855,16 @@ class Game:
 
 def card_label(c: Card) -> str:
     if c.type is CardType.YELLOW:
-        return f"Золото +{c.coins}"
+        return f"Gold +{c.coins}"
     if c.type is CardType.BLUE:
-        return f"Кольцо ×{c.quest_steps}"
+        return f"Ring ×{c.quest_steps}"
     if c.type is CardType.GREEN:
-        return f"Раса: {RACE_RU[c.race]}"
+        return f"Race: {RACE_RU[c.race]}"
     if c.type is CardType.RED:
         dst = "/".join(REGION_RU[d] for d in c.destinations)
-        return f"Война ×{c.troops} ({dst})"
+        return f"War ×{c.troops} ({dst})"
     if c.type is CardType.PURPLE:
-        return "Манёвры"
+        return "Maneuvers"
     if c.skills_choice:
-        return "Навык: " + "/".join(SKILL_RU[s] for s in c.skills_choice)
-    return "Навык: " + "+".join(SKILL_RU[s] for s in c.skills)
+        return "Skill: " + "/".join(SKILL_RU[s] for s in c.skills_choice)
+    return "Skill: " + "+".join(SKILL_RU[s] for s in c.skills)

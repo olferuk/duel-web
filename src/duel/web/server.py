@@ -22,7 +22,7 @@ STATIC = Path(__file__).parent / "static"
 # public-hosting mode: legacy global endpoints off, curated bots only, CSP on
 PUBLIC = os.environ.get("DUEL_PUBLIC") == "1"
 
-app = FastAPI(title="Дуэль за Средиземье", docs_url=None if PUBLIC else "/docs", redoc_url=None)
+app = FastAPI(title="Duel for Middle-earth", docs_url=None if PUBLIC else "/docs", redoc_url=None)
 
 # ---- basic abuse protection (public internet is full of bored kids) ----
 RATE_WINDOW = 10.0  # seconds
@@ -56,7 +56,7 @@ async def hardening(request: Request, call_next):
         while q and now - q[0] > RATE_WINDOW:
             q.popleft()
         if len(q) >= RATE_LIMIT:
-            return JSONResponse({"detail": "слишком много запросов, притормози"}, status_code=429)
+            return JSONResponse({"detail": "too many requests, slow down"}, status_code=429)
         q.append(now)
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -121,58 +121,58 @@ BOT_MENU = [
     # владелец решил, что лестница общая — мера «сложности для игрока», а не режима)
     {
         "id": "galadriel",
-        "label": "👑 Галадриэль · ELO ≈1250",
-        "desc": "Владычица Лориэна, шестое воплощение династии: союзы шести рас (MCTS-240)",
+        "label": "👑 Galadriel · ELO ≈1250",
+        "desc": "Lady of Lothlórien, sixth of her dynasty: alliances of six races (MCTS-240)",
     },
     {
         "id": "manwe",
-        "label": "🦅 Манвэ · ELO ≈1250",
-        "desc": "Король Валар, владыка ветров: сеть-ученица поиска Галадриэли (Зевс-линия, MCTS-240). Честный, без подглядываний",
+        "label": "🦅 Manwë · ELO ≈1250",
+        "desc": "King of the Valar, lord of the winds: a network trained on Galadriel's search (Zeus line, MCTS-240). Plays fair, no peeking",
     },
     {
         "id": "champion",
-        "label": "Гэндальф · ELO ≈1100",
-        "desc": "Экс-чемпион: глубокий поиск (MCTS-240) + нейросеть w3. Честный, без подглядываний",
+        "label": "Gandalf · ELO ≈1100",
+        "desc": "Former champion: deep search (MCTS-240) + w3 neural net. Plays fair, no peeking",
     },
     {
         "id": "strong",
-        "label": "Элронд · ELO ≈990",
-        "desc": "Тот же мозг, что у Гэндальфа, но вдвое меньше раздумий (MCTS-120 + w3)",
+        "label": "Elrond · ELO ≈990",
+        "desc": "Same brain as Gandalf with half the thinking (MCTS-120 + w3)",
     },
     {
         "id": "mcts",
-        "label": "Арагорн · ELO ≈1030",
-        "desc": "Опытный следопыт: классический Монте-Карло с ручной эвристикой, без нейросетей",
+        "label": "Aragorn · ELO ≈1030",
+        "desc": "Seasoned ranger: classic Monte Carlo with a handmade heuristic, no neural nets",
     },
     {
         "id": "frodo",
-        "label": "Фродо · ELO ≈1010 · стиль: Кольцо",
-        "desc": "Верен миссии: рвётся по Пути Кольца к Роковой горе, порой в ущерб всему прочему",
+        "label": "Frodo · ELO ≈1010 · style: Ring",
+        "desc": "Stays on mission: rushes along the Ring Path to Mount Doom, whatever the cost",
     },
     {
         "id": "witch_king",
-        "label": "Король-чародей · ELO ≈1105 · стиль: война",
-        "desc": "Агрессор: армии, крепости и захват регионов прежде всего",
+        "label": "Witch-king · ELO ≈1105 · style: war",
+        "desc": "Aggressor: armies, fortresses and region grabs come first",
     },
     {
         "id": "gollum",
-        "label": "Голлум · ELO ≈1070 · стиль: прелесть",
-        "desc": "Копит золото и ищет выгоду. Моя пре-е-елесть",
+        "label": "Gollum · ELO ≈1070 · style: precious",
+        "desc": "Hoards gold and hunts for profit. My preciousss",
     },
     {
         "id": "2ply",
-        "label": "Боромир · ELO ≈920",
-        "desc": "Смотрит на свой ход и твой ответ — но не дальше (минимакс на 2 хода)",
+        "label": "Boromir · ELO ≈920",
+        "desc": "Sees its own move and your reply, but no further (2-ply minimax)",
     },
     {
         "id": "greedy",
-        "label": "Гимли · ELO ≈790",
-        "desc": "Жадина: берёт лучшее прямо сейчас, не думая о будущем",
+        "label": "Gimli · ELO ≈790",
+        "desc": "Greedy: grabs the best move right now and ignores the future",
     },
     {
         "id": "random",
-        "label": "Пиппин · ELO ≈95",
-        "desc": "Дурак Тука: ходит наугад. Идеален для знакомства с правилами",
+        "label": "Pippin · ELO ≈95",
+        "desc": "Fool of a Took: moves at random. Perfect for learning the rules",
     },
 ]
 
@@ -182,9 +182,9 @@ def _automa_desc(cid: str) -> str:
 
     ch = CHARACTERS[cid]
     pref = "/".join(COLOR_RU[t] for t in sorted(ch.preferred, key=str))
-    parts = [ch.power_ru, f"предпочитает {pref} карты"]
+    parts = [ch.power_ru, f"prefers {pref} cards"]
     if ch.repeats:
-        parts.append("повтор хода: " + " и ".join(REPEAT_RU[r] for r in sorted(ch.repeats)))
+        parts.append("repeat turn: " + " and ".join(REPEAT_RU[r] for r in sorted(ch.repeats)))
     return "; ".join(parts)
 
 
@@ -295,7 +295,7 @@ def _make_bot(kind: str, seed: int = 7):
     if kind.startswith("automa-"):
         cid = kind[len("automa-") :]
         if cid not in CHARACTERS:
-            raise HTTPException(400, f"неизвестный персонаж автомы {cid!r}")
+            raise HTTPException(400, f"unknown automa character {cid!r}")
         return Automa(cid, seed=seed)
 
     from duel.ai.mcts import HonestMctsBot
@@ -355,7 +355,7 @@ def bot_step(kind: str = "mcts") -> dict:
     """Have the bot make one move for the current player."""
     _legacy_guard()
     if kind.startswith("automa-"):
-        raise HTTPException(400, "автома играет только в комнатах (нужны её правила в партии)")
+        raise HTTPException(400, "the automa only plays in rooms (its rules must be in the game)")
     g: Game | None = state["game"]
     if g is None:
         raise HTTPException(400, "no game")
@@ -422,7 +422,7 @@ def _purge_rooms() -> None:
 def _room(rid: str) -> dict:
     room = ROOMS.get(rid)
     if room is None:
-        raise HTTPException(404, "комната не найдена или устарела")
+        raise HTTPException(404, "room not found or expired")
     return room
 
 
@@ -468,7 +468,7 @@ def _seat_of(room: dict, token: str) -> int:
     for s, t in room["seats"].items():
         if t == token:
             return s
-    raise HTTPException(403, "не твоя комната")
+    raise HTTPException(403, "not your room")
 
 
 # Туториал: фиксированный сид (раскладка выверена под сценарий рельсов в
@@ -484,7 +484,7 @@ def room_new(body: NewRoom, request: Request) -> dict:
     if body.mode not in ("bot", "pvp", "hotseat", "tutorial"):
         raise HTTPException(400, "mode: bot | pvp | hotseat | tutorial")
     if len(ROOMS) >= MAX_ROOMS:
-        raise HTTPException(503, "сервер переполнен, попробуй позже")
+        raise HTTPException(503, "server is full, try again later")
     ip = _client_ip(request)
     if PUBLIC:  # локальной разработке кап не мешает
         active = sum(
@@ -493,13 +493,13 @@ def room_new(body: NewRoom, request: Request) -> dict:
             if r.get("ip") == ip and r["game"].winner is None
         )
         if active >= MAX_ROOMS_PER_IP:
-            raise HTTPException(429, "слишком много комнат с одного адреса")
+            raise HTTPException(429, "too many rooms from one address")
     if PUBLIC and body.mode == "bot" and (body.bot or "mcts") not in {m["id"] for m in BOT_MENU}:
-        raise HTTPException(400, "неизвестный бот")
+        raise HTTPException(400, "unknown bot")
     if body.allies and (body.mode == "tutorial" or (body.bot or "").startswith("automa-")):
         # герои (поиск по legal_moves) играют с союзниками — лаборатория 2026-08-30:
         # gala_gen6 бьёт эвристику 66% @120 / 81% @300 в allies; автома — только база
-        raise HTTPException(400, "режим «Союзники» недоступен в туториале и против автомы")
+        raise HTTPException(400, "Allies is unavailable in the tutorial and against the automa")
     rid = secrets.token_urlsafe(4)
     token = secrets.token_urlsafe(9)
     side = 1 if body.side == 1 else 0
@@ -548,7 +548,7 @@ def room_join(rid: str) -> dict:
     room = _room(rid)
     free = [s for s, t in room["seats"].items() if t is None]
     if not free:
-        raise HTTPException(409, "комната уже занята")
+        raise HTTPException(409, "room is already taken")
     token = secrets.token_urlsafe(9)
     room["seats"][free[0]] = token
     room["version"] += 1
@@ -581,7 +581,7 @@ def room_move(rid: str, body: RoomMove) -> dict:
     if g.winner is None:
         actor = _actor(g)
         if room["seats"].get(actor) != body.token:
-            raise HTTPException(403, "сейчас не твой ход")
+            raise HTTPException(403, "it is not your turn")
         legal = g.legal_moves()
         if body.move not in legal:
             stripped = {k: v for k, v in body.move.items() if k != "label"}
@@ -603,10 +603,10 @@ def room_bot_step(rid: str, body: RoomToken) -> dict:
     seat = _seat_of(room, body.token)
     g: Game = room["game"]
     if room["mode"] not in ("bot", "tutorial") or room["bot"] is None:
-        raise HTTPException(400, "в этой комнате нет бота")
+        raise HTTPException(400, "this room has no bot")
     if g.winner is None and _actor(g) == room["bot_seat"]:
         if not _BOT_SLOTS.acquire(timeout=20):
-            raise HTTPException(503, "боты перегружены, повтори через пару секунд")
+            raise HTTPException(503, "bots are busy, try again in a few seconds")
         try:
             mv = room["bot"].choose(g)
         finally:

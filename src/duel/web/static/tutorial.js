@@ -15,118 +15,118 @@
   const STEPS = [
     {
       type: "info",
-      text: "<b>Добро пожаловать в Средиземье!</b> Это обучение: сыграем начало " +
-        "настоящей партии, я подскажу каждый шаг. Ты играешь за <b class='f'>Братство " +
-        "Кольца</b> против Саурона.",
+      text: "<b>Welcome to Middle-earth!</b> This is the tutorial: we'll play the start " +
+        "of a real game and I'll guide every step. You play the <b class='f'>Fellowship " +
+        "of the Ring</b> against Sauron.",
     },
     {
       type: "info",
       hl: [".mid-row .board", "#map"],
-      text: "Победить можно тремя способами. <b>Первый — покорение:</b> занять все " +
-        "7 регионов Средиземья (юнитом или крепостью). Счёт присутствия — плашки " +
-        "1/7 в углах карты.",
+      text: "There are three ways to win. <b>First, conquest:</b> hold all " +
+        "7 regions of Middle-earth with a unit or fortress. Your presence score is on the " +
+        "1/7 plates in the map corners.",
     },
     {
       type: "info",
       hl: ["#race-vps", "#race-row"],
-      text: "<b>Второй — расы:</b> собрать символы 6 разных рас на зелёных картах " +
-        "(орёл хоббитов тоже считается). Счётчик N/6 — над рядом жетонов.",
+      text: "<b>Second, races:</b> collect symbols of 6 different races on green cards " +
+        "(the Hobbits' eagle counts too). The N/6 counter sits above the token row.",
     },
     {
       type: "info",
       hl: [".quest"],
-      text: "<b>Третий — Кольцо:</b> довести Фродо и Сэма до Роковой горы по этому " +
-        "треку. А Саурон побеждает, когда назгул догонит Фродо и Сэма.",
+      text: "<b>Third, the Ring:</b> take Frodo and Sam to Mount Doom along this " +
+        "track. Sauron wins if the Nazgûl catches them.",
     },
     {
       type: "info",
       hl: ["#tableau"],
-      text: "Карты эпохи разложены пирамидой. Брать можно только <b>открытые и не " +
-        "накрытые</b> (они подсвечены зелёной рамкой). Закрытые перевернутся, когда " +
-        "освободятся.",
+      text: "The chapter's cards form a pyramid. You can only take cards that are <b>face up and " +
+        "uncovered</b> (they have a green frame). Face-down cards flip when " +
+        "they are freed.",
     },
     {
       type: "bot",
-      text: "Саурон ходит первым. Нажми — посмотрим, что он возьмёт.",
-      btn: "⚔️ Ход Саурона",
+      text: "Sauron goes first. Press the button to see what he takes.",
+      btn: "⚔️ Sauron's turn",
     },
     {
       type: "move",
       match: { type: "play", slot: 14 },
       hl: ['#tableau .card[data-slot="14"]'],
-      text: "Твой ход! Возьми подсвеченную <b>серую карту</b> «Отвага». Серые карты " +
-        "дают <b>навыки</b> — это постоянная скидка: карта с таким значком в цене " +
-        "станет для тебя дешевле. Эта — бесплатная: жми и выбери «Сыграть».",
+      text: "Your turn! Take the highlighted <b>grey card</b> “Courage”. Grey cards " +
+        "give <b>skills</b>, a permanent discount: any card with this icon in its cost " +
+        "gets cheaper for you. This one is free: click it and choose “Play”.",
     },
-    { type: "bot", text: "Ход Саурона.", btn: "⚔️ Ход Саурона" },
+    { type: "bot", text: "Sauron's turn.", btn: "⚔️ Sauron's turn" },
     {
       type: "move",
       match: { type: "play", slot: 19 },
       hl: ['#tableau .card[data-slot="19"]'],
-      text: "Теперь <b>жёлтая карта</b> «Золото +2» — возьми её. Монеты нужны, когда " +
-        "навыков не хватает: недостающий значок цены можно доплатить монетой " +
-        "(1 значок = 1🪙). И ориентиры строятся тоже за монеты.",
+      text: "Now take the <b>yellow card</b> “Gold +2”. You need coins when " +
+        "you lack skills: pay for a missing cost icon with a coin " +
+        "(1 icon = 1🪙). Landmarks are built with coins too.",
     },
-    { type: "bot", text: "Ход Саурона.", btn: "⚔️ Ход Саурона" },
+    { type: "bot", text: "Sauron's turn.", btn: "⚔️ Sauron's turn" },
     {
       type: "move",
       match: { type: "play", slot: 9 },
       hl: ['#tableau .card[data-slot="9"]'],
-      text: "<b>Красная карта</b> «Война» — возьми. Красные выставляют юнитов в один " +
-        "из регионов, указанных на карте: так захватывают Средиземье.",
+      text: "Take the <b>red card</b> “War”. Red cards place units in one " +
+        "of the regions shown on the card. That is how you conquer Middle-earth.",
     },
     {
       type: "move",
       match: { type: "place", region: "rhovanion" },
       hl: ['.map-zone[data-region="rhovanion"]'],
-      text: "Теперь выбери регион: тапни <b>Рованион</b> на карте — юнит высадится " +
-        "туда. Если в регионе встретятся юниты обеих сторон, они разменяются 1:1.",
+      text: "Now choose a region: tap <b>Rhovanion</b> on the map and your unit lands " +
+        "there. If both sides meet in a region, their units trade 1:1.",
     },
     {
       type: "bot",
-      text: "Смотри: Саурон сейчас <b>продаст</b> карту — любую карту можно не " +
-        "играть, а сбросить за монеты (в 1-й эпохе +1🪙, дальше дороже).",
-      btn: "⚔️ Ход Саурона",
+      text: "Watch: Sauron will <b>sell</b> a card. Instead of playing a card you can " +
+        "discard it for coins (+1🪙 in Chapter 1, more later).",
+      btn: "⚔️ Sauron's turn",
     },
     {
       type: "move",
       match: { type: "play", slot: 13 },
       hl: ['#tableau .card[data-slot="13"]'],
-      text: "<b>Зелёная карта</b> «Эльфы». У тебя нет навыка из её цены — видишь " +
-        "ценник 1🪙? Это та самая доплата монетой. Бери: расы приближают победу, " +
-        "а 2 одинаковых или 3 разных символа дадут <b>жетон союза</b> с бонусом.",
+      text: "<b>Green card</b> “Elves”. You lack a skill from its cost, so see the " +
+        "1🪙 price tag? That is the coin top-up. Take it: races bring you closer to victory, " +
+        "and 2 matching or 3 different symbols earn an <b>alliance token</b> with a bonus.",
     },
-    { type: "bot", text: "Ход Саурона.", btn: "⚔️ Ход Саурона" },
+    { type: "bot", text: "Sauron's turn.", btn: "⚔️ Sauron's turn" },
     {
       type: "move",
       match: { type: "play", slot: 12 },
       hl: ['#tableau .card[data-slot="12"]'],
-      text: "И <b>синяя карта</b> «Кольцо» — возьми: Фродо и Сэм сделают шаг к " +
-        "Роковой горе. Важно: назгул при этом <b>не отстаёт</b> — его полоса тянется " +
-        "следом, так что разрыв между вами может лишь сохраняться или сокращаться. " +
-        "На клетках трека попадаются бонусы — монеты, юниты и даже дополнительный ход.",
+      text: "Take the <b>blue card</b> “Ring”: Frodo and Sam step closer to " +
+        "Mount Doom. Note that the Nazgûl <b>doesn't fall behind</b>: its strip follows " +
+        "them, so the gap can only hold or shrink. " +
+        "Track spaces hold bonuses: coins, units and even an extra turn.",
     },
-    { type: "bot", text: "Ход Саурона.", btn: "⚔️ Ход Саурона" },
+    { type: "bot", text: "Sauron's turn.", btn: "⚔️ Sauron's turn" },
     {
       type: "info",
       hl: ["#landmark-row"],
-      text: "Осталось два элемента. <b>Ориентиры</b> (тайлы сверху): покупаются за " +
-        "монеты, ставят крепость в свой регион и дают мощные бонусы. Крепость — " +
-        "постоянное присутствие, юниты через неё не размениваются.",
+      text: "Two things left. <b>Landmarks</b> (the tiles on top) cost " +
+        "coins, put a fortress in their region and give strong bonuses. A fortress is " +
+        "permanent presence: units don't trade against it.",
     },
     {
       type: "info",
       hl: ["#race-row"],
-      text: "И <b>жетоны союзов</b>: собрал 2 одинаковых символа расы — открываешь " +
-        "<b>два</b> верхних жетона её стопки и оставляешь себе один. Собрал 3 разных " +
-        "значка — открываешь верхний жетон каждой из трёх стопок и оставляешь один " +
-        "(такое — раз за партию). Эффекты — от лишних ходов до юнитов и монет.",
+      text: "And <b>alliance tokens</b>: collect 2 matching race symbols and you reveal " +
+        "the top <b>two</b> tokens of that stack and keep one. Collect 3 different " +
+        "symbols and you reveal the top token of each of the three stacks and keep one " +
+        "(once per game). Effects range from extra turns to units and coins.",
     },
     {
       type: "end",
-      text: "<b>Ты готов!</b> Доиграй партию сам — соперник в обучении не самый " +
-        "грозный. Помни про три пути к победе и следи, куда клонится Саурон. Удачи!",
-      btn: "⚔️ В бой!",
+      text: "<b>You're ready!</b> Finish the game yourself. The tutorial opponent isn't the most " +
+        "dangerous. Remember the three paths to victory and watch where Sauron is heading. Good luck!",
+      btn: "⚔️ To battle!",
     },
   ];
 
@@ -235,7 +235,7 @@
     if (s.type === "info" || s.type === "end") {
       const b = document.createElement("button");
       b.className = "btn small";
-      b.textContent = s.btn || "Далее →";
+      b.textContent = s.btn || "Next →";
       b.addEventListener("click", () => {
         if (s.type === "end") stop();
         else advance();
@@ -244,7 +244,7 @@
     } else if (s.type === "bot") {
       const b = document.createElement("button");
       b.className = "btn small";
-      b.textContent = s.btn || "⚔️ Ход Саурона";
+      b.textContent = s.btn || "⚔️ Sauron's turn";
       b.addEventListener("click", async () => {
         b.disabled = true;
         await window.tutBotStep(); // один ход бота (app.js)

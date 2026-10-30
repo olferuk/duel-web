@@ -1,6 +1,6 @@
-# Дуэль за Средиземье — веб-версия
+# Duel for Middle-earth: web version
 
-Играбельный прототип настольной игры: 6 честных ботов (от случайного до
-нейросетевого чемпиона на ONNX), PvP-комнаты по ссылке, hot-seat.
-Деплой: Render (Blueprint из render.yaml) или любой Docker-хост.
-Основной репозиторий исследования (движок, обучение, арена) — локальный.
+A playable board-game prototype: fair bots that never peek at hidden information, from random
+play to a neural-network champion on ONNX, PvP rooms by link, and hot-seat.
+Deployment: Render (Blueprint from render.yaml) or any Docker host.
+The main research repository (engine, training, arena) is private.

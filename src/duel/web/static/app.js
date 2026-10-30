@@ -1,6 +1,6 @@
 const $ = (sel) => document.querySelector(sel);
 
-const COIN_IMG = '<img class="coin" src="/static/icons/coin.png" alt="монета">';
+const COIN_IMG = '<img class="coin" src="/static/icons/coin.png" alt="coin">';
 const coinify = (s) => String(s).replaceAll("🪙", COIN_IMG);
 
 async function api(path, opts) {
@@ -22,21 +22,21 @@ const RACE_ICONS = {
   hobbits: "🌿", dwarves: "🔨", humans: "📯", elves: "🧪", ents: "🍃", wizards: "🔮",
 };
 const RACE_RU = {
-  hobbits: "Хоббиты", dwarves: "Гномы", humans: "Люди",
-  elves: "Эльфы", ents: "Энты", wizards: "Маги",
+  hobbits: "Hobbits", dwarves: "Dwarves", humans: "Humans",
+  elves: "Elves", ents: "Ents", wizards: "Wizards",
 };
 const LINK_RU = {
-  Pot: "Котелок", Anvil: "Наковальня", Horseshoe: "Подкова", Harp: "Арфа",
-  Horse: "Конь", Backpack: "Рюкзак", Fish: "Рыба", "Bow And Arrow": "Лук",
-  Sword: "Меч", Helmet: "Шлем", Chest: "Сундук", Acorn: "Жёлудь",
-  Scroll: "Свиток", Campfire: "Костёр", "Sleeping Bag": "Спальник",
-  "Chest Mail": "Кольчуга", Ax: "Топор",
+  Pot: "Pot", Anvil: "Anvil", Horseshoe: "Horseshoe", Harp: "Harp",
+  Horse: "Horse", Backpack: "Backpack", Fish: "Fish", "Bow And Arrow": "Bow",
+  Sword: "Sword", Helmet: "Helmet", Chest: "Chest", Acorn: "Acorn",
+  Scroll: "Scroll", Campfire: "Campfire", "Sleeping Bag": "Sleeping Bag",
+  "Chest Mail": "Chain Mail", Ax: "Axe",
 };
 const REGION_RU = {
-  lindon: "Линдон", arnor: "Арнор", rhovanion: "Рованион", enedwaith: "Энедвайт",
-  rohan: "Рохан", gondor: "Гондор", mordor: "Мордор",
+  lindon: "Lindon", arnor: "Arnor", rhovanion: "Rhovanion", enedwaith: "Enedwaith",
+  rohan: "Rohan", gondor: "Gondor", mordor: "Mordor",
 };
-const SIDE_RU = ["Братство Кольца", "Саурон"];
+const SIDE_RU = ["Fellowship", "Sauron"];
 
 const TOKEN_ICONS = {
   elves_extra_turn: "🪙🔄",
@@ -107,13 +107,13 @@ const RINGL = {
 };
 
 const SPACE_TIP = {
-  empty: "Пустая клетка",
-  coin: "Бонус: +1 монета из резерва",
-  unit: "Бонус: выставь 1 юнита в любой регион (по желанию)",
-  extra_turn: "Бонус: право дополнительного хода (по желанию)",
-  destroy_fortress: "Бонус: снеси одну вражескую крепость",
-  ring: "Кольцо",
-  doom: "Роковая гора: дойдя сюда, Фродо уничтожает Кольцо — победа Братства",
+  empty: "Empty space",
+  coin: "Bonus: +1 coin from the reserve",
+  unit: "Bonus: place 1 unit in any region (optional)",
+  extra_turn: "Bonus: extra turn (optional)",
+  destroy_fortress: "Bonus: destroy one enemy fortress",
+  ring: "Ring",
+  doom: "Mount Doom: Frodo destroys the Ring here and the Fellowship wins",
 };
 
 function cbMode() { return localStorage.getItem("cbMode") === "1"; }
@@ -174,8 +174,8 @@ function cardBody(card) {
     case "purple": {
       const fx = [];
       if (card.movements) fx.push(`🥾×${card.movements}`);
-      if (card.opp_coins_lost) fx.push(`враг −${card.opp_coins_lost}🪙`);
-      if (card.casualties) fx.push(`враг −${card.casualties}⚔️`);
+      if (card.opp_coins_lost) fx.push(`enemy −${card.opp_coins_lost}🪙`);
+      if (card.casualties) fx.push(`enemy −${card.casualties}⚔️`);
       return `<div class="fx">${fx.map((f) => `<div>${f}</div>`).join("")}</div>`;
     }
   }
@@ -183,7 +183,7 @@ function cardBody(card) {
 }
 
 const SKILL_RU = {
-  Face: "Хитрость", Fist: "Сила", Heart: "Отвага", Crown: "Лидерство", Book: "Знание",
+  Face: "Cunning", Fist: "Strength", Heart: "Courage", Crown: "Leadership", Book: "Knowledge",
 };
 
 function cardTooltip(card) {
@@ -192,41 +192,41 @@ function cardTooltip(card) {
     case "grey":
       lines.push(
         card.skills_choice.length
-          ? "Навык на выбор (один за ход): " + card.skills_choice.map((s) => SKILL_RU[s]).join(" или ")
-          : "Даёт навык: " + card.skills.map((s) => SKILL_RU[s]).join(" + ")
+          ? "Skill of your choice (one per turn): " + card.skills_choice.map((s) => SKILL_RU[s]).join(" or ")
+          : "Gives skill: " + card.skills.map((s) => SKILL_RU[s]).join(" + ")
       );
       break;
     case "yellow":
-      lines.push(`Возьми ${card.coins} монет из резерва.`);
+      lines.push(`Take ${card.coins} coins from the reserve.`);
       break;
     case "blue":
-      lines.push(`Пройди ${card.quest_steps} шаг(а) по Пути Кольца.`);
+      lines.push(`Advance ${card.quest_steps} step(s) on the Ring Path.`);
       break;
     case "green":
-      lines.push(`Раса: ${RACE_RU[card.race]}. Символ для союзов и победы по 6 расам.`);
+      lines.push(`Race: ${RACE_RU[card.race]}. Symbol for alliances and the 6-race victory.`);
       break;
     case "red":
       lines.push(
-        `Выставь ${card.troops} юнит(ов) в ОДИН регион: ${card.destinations.map((d) => REGION_RU[d]).join(" или ")}.`
+        `Place ${card.troops} unit(s) in ONE region: ${card.destinations.map((d) => REGION_RU[d]).join(" or ")}.`
       );
       break;
     case "purple": {
-      if (card.movements) lines.push(`Перемести своих юнитов: ${card.movements} раз(а).`);
-      if (card.opp_coins_lost) lines.push(`Противник теряет ${card.opp_coins_lost} монет(ы).`);
-      if (card.casualties) lines.push(`Убери ${card.casualties} юнит(ов) противника.`);
+      if (card.movements) lines.push(`Move your units: ${card.movements} time(s).`);
+      if (card.opp_coins_lost) lines.push(`Opponent loses ${card.opp_coins_lost} coin(s).`);
+      if (card.casualties) lines.push(`Remove ${card.casualties} enemy unit(s).`);
       break;
     }
   }
   if (card.cost_skills.length || card.cost_coins) {
     const c = card.cost_skills.map((s) => SKILL_RU[s]).join(", ");
     lines.push(
-      "Цена: " + [c, card.cost_coins ? `${card.cost_coins} монет` : ""].filter(Boolean).join(" + ")
+      "Cost: " + [c, card.cost_coins ? `${card.cost_coins} coins` : ""].filter(Boolean).join(" + ")
     );
   } else if (!card.takes_link) {
-    lines.push("Бесплатная.");
+    lines.push("Free.");
   }
-  if (card.takes_link) lines.push(`⛓ Бесплатна при цепочке: ${LINK_RU[card.takes_link]}.`);
-  if (card.gives_link) lines.push(`⛓ Даёт цепочку: ${LINK_RU[card.gives_link]}.`);
+  if (card.takes_link) lines.push(`⛓ Free via chain: ${LINK_RU[card.takes_link]}.`);
+  if (card.gives_link) lines.push(`⛓ Gives chain: ${LINK_RU[card.gives_link]}.`);
   return lines.join("<br>");
 }
 
@@ -292,8 +292,8 @@ function renderMap() {
 
   // плашки присутствия в углах
   if (G && G.players) {
-    h += `<div class="map-vp f" title="${SIDE_RU[0]}: присутствие (7 — победа покорением)">${G.players[0].presence} / 7</div>`;
-    h += `<div class="map-vp s" title="${SIDE_RU[1]}: присутствие (7 — победа покорением)">${G.players[1].presence} / 7</div>`;
+    h += `<div class="map-vp f" title="${SIDE_RU[0]}: presence (7 wins by conquest)">${G.players[0].presence} / 7</div>`;
+    h += `<div class="map-vp s" title="${SIDE_RU[1]}: presence (7 wins by conquest)">${G.players[1].presence} / 7</div>`;
   }
 
   for (const r of (BOARD ? BOARD.regions : [])) {
@@ -345,7 +345,7 @@ function renderMap() {
     if (!m) continue;
     const [a, b] = key.split("|");
     h += `<div class="map-mark lock" style="${P(m[0], m[1])};width:4.2%"
-      title="Балрог (${SIDE_RU[owner]}): по связи ${REGION_RU[a]} ↔ ${REGION_RU[b]} не может двигаться ${SIDE_RU[1 - owner]}">
+      title="Balrog (${SIDE_RU[owner]}): ${SIDE_RU[1 - owner]} cannot move along ${REGION_RU[a]} ↔ ${REGION_RU[b]}">
       <img draggable="false" src="/static/art/allies/power-small.png"></div>`;
   }
   const lockMoves = G && canAct() ? G.moves.filter((m) => m.type === "lock_link") : [];
@@ -388,22 +388,22 @@ function renderQuest(q) {
         style="left:${px(nazX)}%;top:${(RINGL.nazgulY / RINGL.H) * 100}%;width:${px(RINGL.nazgulW)}%">
       ${q.frodo_strip.map((kind, i) => {
         const cx = RINGL.cellX0 + i * RINGL.cellPitch;
-        const tip = i === 0 ? "Старт Фродо" : SPACE_TIP[kind] || kind;
-        return `<div class="ring-zone" title="Путь Фродо, клетка ${i}: ${tip}"
+        const tip = i === 0 ? "Frodo's start" : SPACE_TIP[kind] || kind;
+        return `<div class="ring-zone" title="Frodo's path, space ${i}: ${tip}"
           style="left:${px(cx)}%;top:${(RINGL.bgCellY / RINGL.H) * 100}%"></div>`;
       }).join("")}
       ${q.nazgul_strip.map((kind, i) => {
         const [cx, cy] = RINGL.stripCells[i];
         const tip = kind === "ring"
-          ? "Кольцо: здесь назгул настигает Фродо — победа Саурона"
+          ? "Ring: the Nazgûl catches Frodo here and Sauron wins"
           : SPACE_TIP[kind] || kind;
-        return `<div class="ring-zone naz" title="Путь назгула, клетка ${i}: ${tip}"
+        return `<div class="ring-zone naz" title="Nazgûl path, space ${i}: ${tip}"
           style="left:${px(stripX + cx)}%;top:${((RINGL.frodo.y + cy) / RINGL.H) * 100}%"></div>`;
       }).join("")}
     </div>`;
   $("#quest-vp").innerHTML =
-    `<div class="race-vp s" title="Саурону осталось шагов, чтобы настичь Фродо">🏇 ещё ${sLeft}</div>` +
-    `<div class="race-vp f" title="Братству осталось шагов до Роковой горы (победа Кольцом)">🧝 ещё ${fLeft}</div>`;
+    `<div class="race-vp s" title="Steps left for Sauron to catch Frodo">🏇 ${sLeft} left</div>` +
+    `<div class="race-vp f" title="Steps left for the Fellowship to reach Mount Doom (Ring victory)">🧝 ${fLeft} left</div>`;
 }
 
 /* ---------- tableau ---------- */
@@ -454,7 +454,7 @@ function renderTableau() {
       // жетон Силы лежит НА карте: его забирает тот, чьё действие её вскроет
       const power = (G.power_slots || []).includes(s.id)
         ? `<img class="power-on-card" draggable="false" src="/static/art/allies/power-small.png"
-             title="Жетон Силы: достанется тому, кто вскроет эту карту">`
+             title="Power token: goes to whoever reveals this card">`
         : "";
       const content =
         (s.revealed
@@ -528,7 +528,7 @@ function soldGroups(open) {
 function pileLabel(c) {
   if (c.type === "green") return RACE_RU[c.race];
   if (c.type === "red") return c.destinations.map((d) => REGION_RU[d]).join("/");
-  if (c.type === "purple") return "манёвры";
+  if (c.type === "purple") return "maneuvers";
   return "";
 }
 
@@ -536,13 +536,13 @@ function renderPiles() {
   const open = G.discard_open || [];
   $("#piles").innerHTML = coinify(`
     <div class="pile facedown-pile"
-      title="Отложены из игры при сетапе эпох (по 3 закрытых): в сброс не входят и в игру не вернутся">
-      <span class="pile-num">${G.discard_hidden}</span><span class="pile-cap">вне игры</span>
+      title="Set aside during chapter setup (3 face down each): not in the discard and out of the game">
+      <span class="pile-num">${G.discard_hidden}</span><span class="pile-cap">out of play</span>
     </div>
     <div class="pile open-pile ${open.length ? "clickable" : ""}"
-      title="Проданные и снятые карты — кликни, чтобы посмотреть">
-      <span class="pile-num">${open.length}</span><span class="pile-cap">продано</span>
-      ${open.length ? `<div class="pile-pop"><b>Проданные карты:</b>${soldGroups(open)}</div>` : ""}
+      title="Sold and removed cards. Click to view">
+      <span class="pile-num">${open.length}</span><span class="pile-cap">sold</span>
+      ${open.length ? `<div class="pile-pop"><b>Sold cards:</b>${soldGroups(open)}</div>` : ""}
     </div>`);
   const op = document.querySelector(".open-pile.clickable");
   if (op)
@@ -631,7 +631,7 @@ document.addEventListener("click", (e) => {
     const tip = tile.querySelector(".lm-pop");
     const actions = _tileBuy[id]
       ? [{
-          label: `Купить ${_tileBuy[id].label.match(/\((.+)\)/)?.[1] || ""}`,
+          label: `Buy ${_tileBuy[id].label.match(/\((.+)\)/)?.[1] || ""}`,
           fn: () => doMove(_tileBuy[id]),
         }]
       : [];
@@ -642,7 +642,7 @@ document.addEventListener("click", (e) => {
   const cell = e.target.closest(".ring-zone");
   if (cell) {
     const t = cell.getAttribute("title") || "";
-    if (/Пустая клетка|Старт/.test(t)) { hidePopover(); return; } // пустая клетка — без тултипа
+    if (/Empty space|Frodo's start/.test(t)) { hidePopover(); return; } // пустая клетка — без тултипа
     e.stopPropagation();
     mobileMenu(cell, t, []);
     return;
@@ -652,7 +652,7 @@ document.addEventListener("click", (e) => {
   if (tok) {
     e.stopPropagation();
     const pop = tok.querySelector(".race-pop");
-    mobileMenu(tok, pop ? pop.innerHTML : "<b>Стопка пуста</b>", []);
+    mobileMenu(tok, pop ? pop.innerHTML : "<b>Stack is empty</b>", []);
     return;
   }
 
@@ -735,12 +735,12 @@ window.addEventListener("scroll", hidePop, true);
 
 function shortLabel(m) {
   if (m.type === "play")
-    return m.chained ? "▶ Сыграть ⛓ 0🪙" : `▶ Сыграть ${m.cost}🪙`;
-  if (m.type === "discard") return `🗑 Продать +${m.gain}🪙`;
-  if (m.type === "shire_pick") return `Шир ${m.cost != null ? m.cost + "🪙" : ""}`;
+    return m.chained ? "▶ Play ⛓ 0🪙" : `▶ Play ${m.cost}🪙`;
+  if (m.type === "discard") return `🗑 Sell +${m.gain}🪙`;
+  if (m.type === "shire_pick") return `The Shire ${m.cost != null ? m.cost + "🪙" : ""}`;
   // на самой карте имя уже видно — в меню оставляем только действие и цену
-  if (m.type === "ally_enter") return "✋ Призвать · 1 жетон";
-  if (m.type === "ally_exit") return "👋 Прощание · 2 жетона";
+  if (m.type === "ally_enter") return "✋ Summon · 1 token";
+  if (m.type === "ally_exit") return "👋 Farewell · 2 tokens";
   return m.label;
 }
 
@@ -769,15 +769,15 @@ function showChooser(anchor, moves) {
 /* ---------- landmarks / races / panels ---------- */
 
 const LM_TEXT = {
-  barad_dur: "Крепость в Мордоре. Тайно выбери 1 карту из сброса и сыграй её бесплатно.",
-  bree: "Крепость и 2 юнита в Арноре. Соверши 2 перемещения по карте.",
-  erebor: "Крепость в Рованионе. Возьми 5 монет из резерва. 1 перемещение по карте.",
-  grey_havens: "Крепость в Линдоне. Возьми 2 верхних жетона любой расы, оставь себе 1.",
-  helms_deep: "Крепость и 3 юнита в Рохане.",
-  isengard: "Крепость в Энедвайте. Сбрось 1 серую карту противника. +1 шаг по Пути Кольца.",
-  minas_tirith: "Крепость и 1 юнит в Гондоре. +2 шага по Пути Кольца.",
-  shire: "Сыграй любую видимую карту текущей эпохи (даже недоступную), оплатив её. Крепость НЕ ставится.",
-  grond: "Снеси вражескую крепость в любом регионе (её юниты отступают в соседний). Поставь там свою крепость и 1 юнита.",
+  barad_dur: "Fortress in Mordor. Secretly choose 1 card from the discard and play it for free.",
+  bree: "Fortress and 2 units in Arnor. Make 2 moves on the map.",
+  erebor: "Fortress in Rhovanion. Take 5 coins from the reserve. 1 move on the map.",
+  grey_havens: "Fortress in Lindon. Take the top 2 tokens of any race and keep 1.",
+  helms_deep: "Fortress and 3 units in Rohan.",
+  isengard: "Fortress in Enedwaith. Discard 1 enemy grey card. +1 step on the Ring Path.",
+  minas_tirith: "Fortress and 1 unit in Gondor. +2 steps on the Ring Path.",
+  shire: "Play any visible card of the current chapter (even an unavailable one) by paying for it. No fortress is placed.",
+  grond: "Destroy an enemy fortress in any region (its units retreat to a neighbor). Place your own fortress and 1 unit there.",
 };
 
 function renderLandmarks() {
@@ -803,19 +803,19 @@ function renderLandmarks() {
           lockedBy === undefined
             ? ""
             : `<img class="power-lock" draggable="false" src="/static/art/allies/power-small.png"
-                 title="Вождь урук-хай: ориентир заперт, взять его может только ${SIDE_RU[lockedBy]}">`;
+                 title="Uruk-hai Chief: landmark locked, only ${SIDE_RU[lockedBy]} can take it">`;
         return `<div class="tile art ${m ? "buyable" : ""}" data-tile="${lm.id}">
           <img draggable="false" src="/static/art/landmarks/${lm.id}.jpg">
           ${tag}${lock}
           <div class="lm-pop"><b>${lm.name}</b><br>${LM_TEXT[lm.id] || ""}
-            <div class="lm-pop-note">Эффекты: ${eff.join(" ")} · Доплата: +1🪙 за каждую свою крепость</div>
+            <div class="lm-pop-note">Effects: ${eff.join(" ")} · Surcharge: +1🪙 per fortress you own</div>
           </div>
         </div>`;
       })
-      .join("") || '<div class="area-hint">нет открытых тайлов</div>');
+      .join("") || '<div class="area-hint">no open tiles</div>');
   if (G.landmarks_deck > 0)
     $("#landmark-row").innerHTML +=
-      `<div class="tile art stack" title="Закрытые тайлы в стопке (промо-тайлы: ${G.promo ? "в игре" : "выключены"})">` +
+      `<div class="tile art stack" title="Face-down tiles in the stack (promo tiles: ${G.promo ? "in play" : "off"})">` +
       `<img draggable="false" src="/static/art/landmarks/_back.jpg"><small>×${G.landmarks_deck}</small></div>`;
   _tileBuy = movesByTile;
   // покупка тайла — коротким тапом/кликом (тултип — по долгому нажатию)
@@ -829,7 +829,7 @@ const RACE_ORDER = ["elves", "hobbits", "humans", "dwarves", "ents", "wizards"];
 function renderRaces() {
   const raceChip = (i) =>
     `<div class="race-vp ${i ? "s" : "f"}"
-       title="${SIDE_RU[i]}: рас в поддержке (6 — победа по расам)">
+       title="${SIDE_RU[i]}: races in support (6 wins by races)">
        ${i ? "🏇" : "🧝"} ${G.players[i].race_victory_count}/6</div>`;
   $("#race-vps").innerHTML = raceChip(0) + raceChip(1);
   $("#race-row").innerHTML = RACE_ORDER.filter((r) => r in G.alliance_stacks)
@@ -838,7 +838,7 @@ function renderRaces() {
       const n = typeof st === "number" ? st : st.count;
       const tokens = typeof st === "number" ? [] : st.tokens;
       const pop = tokens.length
-        ? `<div class="race-pop"><b>В стопке (порядок неизвестен):</b>${tokens
+        ? `<div class="race-pop"><b>In the stack (order unknown):</b>${tokens
             .map(
               (t) =>
                 `<div class="race-pop-chip"><img class="tok-art" src="/static/art/tokens/${t.id}.png">
@@ -851,7 +851,7 @@ function renderRaces() {
         lockedBy === undefined
           ? ""
           : `<img class="power-lock" draggable="false" src="/static/art/allies/power-small.png"
-               title="Шелоб: стопка заперта, брать и смотреть может только ${SIDE_RU[lockedBy]}">`;
+               title="Shelob: stack locked, only ${SIDE_RU[lockedBy]} can draw or look">`;
       return `<div class="race-token-art">
         <img draggable="false" src="/static/art/tokens/_back_${race}.png">
         <small>×${n}</small>${lock}${pop}
@@ -925,8 +925,8 @@ function allyCard(a, cls) {
   return `<div class="ally ${cls}${playable}" data-ally="${a.id}">
     <img draggable="false" src="/static/art/allies/${a.id}.jpg">
     <div class="card-pop"><b>${a.name}</b>
-      <div class="ally-eff"><i>Призыв (1 жетон):</i> ${a.enter}</div>
-      <div class="ally-eff"><i>Прощание (2 жетона):</i> ${a.exit}</div>
+      <div class="ally-eff"><i>Summon (1 token):</i> ${a.enter}</div>
+      <div class="ally-eff"><i>Farewell (2 tokens):</i> ${a.exit}</div>
     </div>
   </div>`;
 }
@@ -960,7 +960,7 @@ function alliesBlock(seat) {
     !HAS_HOVER && ROOM && ROOM.mode === "hotseat" && seat === G.current && pl.ally_hand_count;
   const peek = peekable
     ? `<button class="btn small ally-peek" data-peek="${open ? "0" : "1"}">
-         ${open ? "🙈 скрыть руку" : "👁 показать мою руку"}</button>`
+         ${open ? "🙈 hide hand" : "👁 show my hand"}</button>`
     : "";
   const rows = [];
   if (pl.ally_hand_count)
@@ -974,13 +974,13 @@ function alliesBlock(seat) {
       `<div class="ally-row">${pl.ally_gone.map((a) => allyCard(a, "gone")).join("")}</div>`
     );
   const locks = G.quest_locks && G.quest_locks[seat]
-    ? `<span class="ally-lock" title="Том Бомбадил: столько продвижений по треку Кольца
-уйдёт на снятие жетонов, прежде чем двигаться">🚫💍 ${G.quest_locks[seat]}</span>`
+    ? `<span class="ally-lock" title="Tom Bombadil: Ring track steps
+needed to remove tokens before moving">🚫💍 ${G.quest_locks[seat]}</span>`
     : "";
   return `<div class="allies-box">
     <div class="power-line">
       <img class="power-ico" draggable="false" src="/static/art/allies/power-small.png">
-      <b>${pl.power}</b> <span class="power-cap">${plural(pl.power, "жетон", "жетона", "жетонов")} Силы</span>${locks}${peek}
+      <b>${pl.power}</b> <span class="power-cap">${plural(pl.power, "Power token", "Power tokens", "Power tokens")}</span>${locks}${peek}
     </div>
     ${rows.join("")}
   </div>`;
@@ -1119,9 +1119,9 @@ function renderPanels() {
       .join("");
     el.innerHTML = coinify(`
       <div class="coins">🪙 ${pl.coins}</div>
-      <div class="stat">регионов: ${pl.presence} / 7 · рас: ${pl.race_victory_count} / 6</div>
-      <div class="stat">юнитов в запасе: ${pl.supply}</div>
-      ${pl.tokens.length ? `<div class="tokens-art">${pl.tokens.map((t) => `<span class="tok-wrap"><img class="tok-art ${t.kind === "instant" ? "used" : ""}" src="/static/art/tokens/${t.id}.png"><span class="tok-pop">${t.text}${t.kind === "instant" ? " <i>(использован)</i>" : ""}</span></span>`).join("")}</div>` : ""}
+      <div class="stat">regions: ${pl.presence} / 7 · races: ${pl.race_victory_count} / 6</div>
+      <div class="stat">units in supply: ${pl.supply}</div>
+      ${pl.tokens.length ? `<div class="tokens-art">${pl.tokens.map((t) => `<span class="tok-wrap"><img class="tok-art ${t.kind === "instant" ? "used" : ""}" src="/static/art/tokens/${t.id}.png"><span class="tok-pop">${t.text}${t.kind === "instant" ? " <i>(used)</i>" : ""}</span></span>`).join("")}</div>` : ""}
       ${alliesBlock(i)}
       <div class="stacks">${cardsHtml}</div>
       ${pl.last_action ? `<div class="last-action">${pl.last_action}</div>` : ""}`);
@@ -1131,9 +1131,9 @@ function renderPanels() {
     panel.classList.toggle("won", ended && G.winner === i);
     panel.classList.toggle("lost", ended && G.winner === 1 - i);
     let badge = "";
-    if (ended && G.winner === i) badge = '<div class="result-badge win">🏆 ПОБЕДА! 🎉</div>';
-    else if (ended && G.winner === 1 - i) badge = '<div class="result-badge lose">💀 Поражение</div>';
-    else if (ended) badge = '<div class="result-badge draw">🤝 Ничья</div>';
+    if (ended && G.winner === i) badge = '<div class="result-badge win">🏆 VICTORY! 🎉</div>';
+    else if (ended && G.winner === 1 - i) badge = '<div class="result-badge lose">💀 Defeat</div>';
+    else if (ended) badge = '<div class="result-badge draw">🤝 Draw</div>';
     el.insertAdjacentHTML("afterbegin", badge);
   }
   // привязываемся строго внутри перерисованных панелей: общий по документу
@@ -1209,13 +1209,13 @@ function miniLabel(c) {
 /* ---------- prompt / turn bar ---------- */
 
 // человеческая причина финала (подписываем ею и мигающий индикатор)
-const WIN_WHY = { quest: "Путь Кольца", races: "поддержка рас", conquest: "покорение Средиземья", presence: "присутствие" };
+const WIN_WHY = { quest: "Ring Path", races: "race support", conquest: "conquest of Middle-earth", presence: "presence" };
 
 function renderTurn() {
   const tb = $("#turnbar");
   if (G.winner !== null && G.winner !== undefined) {
     const txt =
-      G.winner === "draw" ? "Ничья!" : `Победа: ${SIDE_RU[G.winner]}`;
+      G.winner === "draw" ? "Draw!" : `Winner: ${SIDE_RU[G.winner]}`;
     const why = WIN_WHY[G.win_reason] || "";
     tb.innerHTML = `🏆 ${txt} <small>(${why})</small>`;
     tb.className = "turnbar winner";
@@ -1223,13 +1223,13 @@ function renderTurn() {
     let who = "";
     if (ROOM && ROOM.mode !== "hotseat")
       who = actorSeat() === ROOM.seat
-        ? " — твой ход"
-        : ["bot", "tutorial"].includes(ROOM.mode) ? "" : " — ждём соперника";
-    if (G.waiting) who = " — ⏳ соперник ещё не подключился";
-    tb.innerHTML = `Эпоха ${G.chapter} · ход ${G.turn_no} · ходит: <b class="${G.current ? "s" : "f"}">${SIDE_RU[G.current]}</b>${who}`;
+        ? " — your turn"
+        : ["bot", "tutorial"].includes(ROOM.mode) ? "" : " — waiting for opponent";
+    if (G.waiting) who = " — ⏳ opponent has not joined yet";
+    tb.innerHTML = `Chapter ${G.chapter} · turn ${G.turn_no} · to move: <b class="${G.current ? "s" : "f"}">${SIDE_RU[G.current]}</b>${who}`;
     tb.className = "turnbar";
   }
-  $("#reserve").textContent = `🪙 резерв: ${G.reserve}`;
+  $("#reserve").textContent = `🪙 reserve: ${G.reserve}`;
 
   renderPrompt();
 }
@@ -1257,15 +1257,15 @@ function renderPrompt() {
   const skipBtn = () => {
     const b = document.createElement("button");
     b.className = "btn small ghost";
-    b.textContent = "Пропустить";
-    b.addEventListener("click", () => doMove({ type: "skip", label: "Пропустить" }));
+    b.textContent = "Skip";
+    b.addEventListener("click", () => doMove({ type: "skip", label: "Skip" }));
     return b;
   };
 
   if (isDiscard) {
     pr.style.display = "";
     pr.innerHTML =
-      `<div class="prompt-title">Сыграй бесплатно любую проданную карту:</div>` +
+      `<div class="prompt-title">Play any sold card for free:</div>` +
       `<div class="prompt-btns"></div>`;
     const box = pr.querySelector(".prompt-btns");
     for (const m of all.filter((m) => m.type === "discard_play")) {
@@ -1284,8 +1284,8 @@ function renderPrompt() {
     // нет — и без явной кнопки «Завершить ход» ход просто застревал.
     pr.style.display = "";
     pr.innerHTML =
-      `<div class="prompt-title">Получен жетон Силы — призвать союзника?` +
-      (handOnScreen ? " Нажми на карту в своей руке." : "") +
+      `<div class="prompt-title">You gained a Power token. Summon an ally?` +
+      (handOnScreen ? " Click a card in your hand." : "") +
       `</div><div class="prompt-btns"></div>`;
     const box = pr.querySelector(".prompt-btns");
     for (const m of btnMoves) {
@@ -1297,24 +1297,24 @@ function renderPrompt() {
     }
     const end = document.createElement("button");
     end.className = "btn small ghost";
-    end.textContent = "➡ Завершить ход";
-    end.addEventListener("click", () => doMove({ type: "skip", label: "Пропустить" }));
+    end.textContent = "➡ End turn";
+    end.addEventListener("click", () => doMove({ type: "skip", label: "Skip" }));
     box.appendChild(end);
   } else if (G.pending && G.pending.type === "shire_play" && canAct()) {
     pr.style.display = "";
-    pr.innerHTML = `<div class="prompt-title">Шир: выбери видимую карту в раскладке</div>`;
+    pr.innerHTML = `<div class="prompt-title">The Shire: choose a visible card in the layout</div>`;
     pr.appendChild(skipBtn());
   } else if (isExtraOffer && btnMoves.length) {
     // доп. ход с трека — отдельный явный вопрос, кнопки вверху экрана
     pr.style.display = "";
     pr.innerHTML =
-      `<div class="prompt-title">🔄 Бонус трека Кольца: сходить ещё раз?</div>` +
+      `<div class="prompt-title">🔄 Ring track bonus: take another turn?</div>` +
       `<div class="prompt-btns"></div>`;
     const box = pr.querySelector(".prompt-btns");
     for (const m of btnMoves) {
       const b = document.createElement("button");
       b.className = "btn small" + (m.take ? "" : " ghost");
-      b.textContent = m.take ? "🔄 Сходить ещё раз" : "➡ Передать ход противнику";
+      b.textContent = m.take ? "🔄 Take another turn" : "➡ Pass the turn";
       b.addEventListener("click", () => doMove(m));
       box.appendChild(b);
     }
@@ -1326,7 +1326,7 @@ function renderPrompt() {
     // не-картовые выборы (доп. ход, жетоны, расы) — кнопками
     pr.style.display = "";
     const why = G.pending && G.pending.why ? ` (${G.pending.why})` : "";
-    pr.innerHTML = `<div class="prompt-title">Выбор${why}:</div><div class="prompt-btns"></div>`;
+    pr.innerHTML = `<div class="prompt-title">Choose${why}:</div><div class="prompt-btns"></div>`;
     const box = pr.querySelector(".prompt-btns");
     for (const m of btnMoves.slice(0, 60)) {
       const b = document.createElement("button");
@@ -1362,8 +1362,8 @@ function renderPrompt() {
 // в логе красим стороны фамильными цветами: Братство — синий, Саурон — тёмно-красный
 function colorSides(text) {
   return text
-    .replace(/Братств(?:о|а|у|ом|е)(\sКольца)?/g, (m) => `<b class="f">${m}</b>`)
-    .replace(/Саурон(?:ом|а|у|е)?/g, (m) => `<b class="s">${m}</b>`);
+    .replace(/Fellowship/g, (m) => `<b class="f">${m}</b>`)
+    .replace(/Sauron/g, (m) => `<b class="s">${m}</b>`);
 }
 
 // в состоянии приходит только хвост журнала (он опрашивается раз в секунду);
@@ -1413,26 +1413,26 @@ function renderMobile() {
   if (ended) {
     const why = WIN_WHY[G.win_reason] ? `: ${WIN_WHY[G.win_reason]}` : "";
     mt.textContent =
-      G.winner === seat ? `🏆 Победа${why}` : G.winner === "draw" ? "🤝 Ничья" : `💀 Поражение${why}`;
+      G.winner === seat ? `🏆 Victory${why}` : G.winner === "draw" ? "🤝 Draw" : `💀 Defeat${why}`;
     mt.className = "";
   } else if (G.waiting) {
-    mt.textContent = "⏳ Ждём соперника";
+    mt.textContent = "⏳ Waiting for opponent";
     mt.className = "";
   } else if (canAct()) {
-    mt.textContent = "▶ Твой ход";
+    mt.textContent = "▶ Your turn";
     mt.className = "my";
   } else {
-    mt.textContent = "⏳ Ход соперника…";
+    mt.textContent = "⏳ Opponent's turn…";
     mt.className = "";
   }
   // сверху справа — жетоны содружества соперника (тап → полный расклад врага)
   const oppToks = ended ? [] : opp.tokens || []; // в финале место нужно под причину победы
   const oppPower =
     G.allies && !ended
-      ? `<span class="m-power" title="жетоны Силы соперника"><img src="/static/art/allies/power-small.png">${opp.power}</span>`
+      ? `<span class="m-power" title="opponent's Power tokens"><img src="/static/art/allies/power-small.png">${opp.power}</span>`
       : "";
   $("#m-opp").innerHTML = oppPower + (oppToks.length
-    ? `<span class="opp-toks ${seat === 1 ? "f" : "s"}" id="opp-toks" title="жетоны содружества соперника">🛡` +
+    ? `<span class="opp-toks ${seat === 1 ? "f" : "s"}" id="opp-toks" title="opponent's alliance tokens">🛡` +
       oppToks
         .slice(0, 3)
         .map(
@@ -1449,7 +1449,7 @@ function renderMobile() {
   // жетоны Силы стоят рядом с монетами: это вторая валюта хода
   const powerChip = (p) =>
     G.allies
-      ? ` <span class="m-power" title="жетоны Силы"><img src="/static/art/allies/power-small.png">${p.power}</span>`
+      ? ` <span class="m-power" title="Power tokens"><img src="/static/art/allies/power-small.png">${p.power}</span>`
       : "";
   // мои жетоны — рядом со своими монетами; жетоны соперника не влезают
   // в нижний бар на 360–390px, поэтому живут в верхнем баре рядом с его щитом
@@ -1463,7 +1463,7 @@ function renderMobile() {
   $("#dock-races").innerHTML = greens.length
     ? greens.map((c) => `<img src="/static/art/cards/${c.id}.jpg">`).join("") +
       `<span class="dock-rc">${pl.race_victory_count}/6</span>`
-    : `<span class="dock-empty">рас ${pl.race_victory_count}/6</span>`;
+    : `<span class="dock-empty">races ${pl.race_victory_count}/6</span>`;
   $("#dock-tokens").innerHTML = pl.tokens.length
     ? pl.tokens
         .map(
@@ -1471,7 +1471,7 @@ function renderMobile() {
             `<span class="dock-tok"><img src="/static/art/tokens/${t.id}.png" class="${
               t.kind === "instant" ? "used" : ""
             }"><span class="tok-tip">${t.text}${
-              t.kind === "instant" ? " <i>(использован)</i>" : ""
+              t.kind === "instant" ? " <i>(used)</i>" : ""
             }</span></span>`
         )
         .join("")
@@ -1492,15 +1492,15 @@ function handSummary(seat) {
             `<span class="dock-tok hand-tok"><img src="/static/art/tokens/${t.id}.png" class="${
               t.kind === "instant" ? "used" : ""
             }"><span class="tok-tip">${t.text}${
-              t.kind === "instant" ? " <i>(использован)</i>" : ""
+              t.kind === "instant" ? " <i>(used)</i>" : ""
             }</span></span>`
         )
         .join("")
-    : `<span class="dock-empty">жетонов содружества пока нет</span>`;
+    : `<span class="dock-empty">no alliance tokens yet</span>`;
   return coinify(
-    `<div class="hand-stat">🪙 ${pl.coins} · регионов ${pl.presence}/7 · рас ${pl.race_victory_count}/6</div>` +
+    `<div class="hand-stat">🪙 ${pl.coins} · regions ${pl.presence}/7 · races ${pl.race_victory_count}/6</div>` +
       `<div class="hand-toks">${toks}</div>` +
-      (pl.tokens.length ? `<div class="hand-hint">жетоны содружества — тапни, чтобы прочитать</div>` : "")
+      (pl.tokens.length ? `<div class="hand-hint">alliance tokens: tap to read</div>` : "")
   );
 }
 
@@ -1509,11 +1509,11 @@ function renderHand() {
   let cards, title, sum = "";
   if (handWho === "sold") {
     cards = G.discard_open || [];
-    title = "Проданные / сброшенные";
+    title = "Sold / discarded";
   } else {
     const seat = handWho === "me" ? mySeat() : 1 - mySeat();
     cards = G.players[seat].played;
-    title = handWho === "me" ? "Мои карты" : `Карты: ${SIDE_RU[1 - mySeat()]}`;
+    title = handWho === "me" ? "My cards" : `Cards: ${SIDE_RU[1 - mySeat()]}`;
     sum = handSummary(seat);
   }
   // союзники живут в том же оверлее: на телефоне боковых панелей нет
@@ -1540,7 +1540,7 @@ function renderHand() {
             .join("") +
           `</div>`
       )
-      .join("") || "<p class='small'>карт пока нет</p>";
+      .join("") || "<p class='small'>no cards yet</p>";
   bindAllies($("#hand-overlay"));
 }
 
@@ -1563,13 +1563,13 @@ function decSlotHtml(slot) {
 }
 
 function decCardHtml(card) {
-  if (!card) return `<span class="dec-none">карта решения ещё не вскрыта</span>`;
+  if (!card) return `<span class="dec-none">no decision card revealed yet</span>`;
   const slots = card.slots.map(decSlotHtml).join(`<span class="dec-arrow">›</span>`);
   const rep = card.repeat
     ? `<span class="dec-rep${card.repeat_matches ? " hit" : ""}"
-        title="Символ повтора хода${card.repeat_matches ? " — совпадает с персонажем: доп. ход!" : " (у этого персонажа не срабатывает)"}">${DEC_REP_ICON[card.repeat]}</span>`
+        title="Repeat symbol${card.repeat_matches ? ": matches the character, extra turn!" : " (inactive for this character)"}">${DEC_REP_ICON[card.repeat]}</span>`
     : "";
-  const dirTip = card.direction === "lr" ? "скан раскладки слева направо" : "скан раскладки справа налево";
+  const dirTip = card.direction === "lr" ? "scan the layout left to right" : "scan the layout right to left";
   return `<span class="dec-card">${slots}${rep}
     <span class="dec-dir" title="${dirTip}">${card.direction === "lr" ? "→" : "←"}</span></span>`;
 }
@@ -1583,35 +1583,35 @@ function renderAutoma() {
   const lastDie = [...(a.trace || [])].reverse().find((t) => t.kind === "die");
   bar.innerHTML =
     `<img class="automa-mini" src="/static/art/solo/${a.art}" alt="" draggable="false">` +
-    `<span class="automa-name">${a.name} <small>· автома</small></span>` +
+    `<span class="automa-name">${a.name} <small>· automa</small></span>` +
     decCardHtml(a.card) +
     (lastDie ? `<span class="automa-die">🎲 ${lastDie.roll}</span>` : "") +
-    `<span class="automa-more">как думает ›</span>`;
+    `<span class="automa-more">how it thinks ›</span>`;
   if (!$("#automa-overlay").classList.contains("hidden")) fillAutomaOverlay();
 }
 
 function fillAutomaOverlay() {
   const a = G && G.automa;
   if (!a) return;
-  $("#automa-title").textContent = `🎲 ${a.name} — автома`;
+  $("#automa-title").textContent = `🎲 ${a.name} — automa`;
   $("#automa-art").src = `/static/art/solo/${a.art}`;
-  $("#automa-power").innerHTML = `<b>Свойства персонажа:</b> ${a.power}`;
+  $("#automa-power").innerHTML = `<b>Character traits:</b> ${a.power}`;
   $("#automa-deckinfo").textContent =
-    `Колода решений: ${a.deck} в стопке · ${a.discarded} в сбросе · играет карты бесплатно, ` +
-    `ориентиры за монеты (7/5/2 + крепости)`;
+    `Decision deck: ${a.deck} in the stack · ${a.discarded} discarded · plays cards for free, ` +
+    `landmarks for coins (7/5/2 + fortresses)`;
   let dec = decCardHtml(a.card);
   if (a.card) {
     dec += `<ol class="dec-legend">${a.card.slots
       .map((s) => `<li>${s.label}</li>`)
       .join("")}</ol>`;
-    dec += `<div class="dec-note">Порядок слотов — приоритет выбора карты; стрелка — направление
-      обхода раскладки${a.card.repeat ? `; ${DEC_REP_ICON[a.card.repeat]} — символ повтора хода` : ""}.</div>`;
+    dec += `<div class="dec-note">Slot order is the card priority; the arrow is the
+      layout scan direction${a.card.repeat ? `; ${DEC_REP_ICON[a.card.repeat]} is the repeat symbol` : ""}.</div>`;
   }
   $("#automa-decision").innerHTML = dec;
   const tr = $("#automa-trace");
   tr.innerHTML = (a.trace || [])
     .map((t) => `<div class="tr-${t.kind}">${t.text}</div>`)
-    .join("") || "<div>автома ещё не ходила</div>";
+    .join("") || "<div>the automa has not moved yet</div>";
   tr.scrollTop = tr.scrollHeight;
 }
 
@@ -1637,9 +1637,9 @@ function renderAll() {
 /* ---------- rooms: bot / pvp / hotseat ---------- */
 
 const PROMO_CHIP =
-  ' <span class="promo-chip" title="В партии участвуют промо-тайлы Шир и Гронд">промо</span>';
+  ' <span class="promo-chip" title="The Shire and Grond promo tiles are in play">promo</span>';
 const ALLIES_CHIP =
-  ' <span class="promo-chip allies-chip" title="Дополнение «Союзники»: жетоны Силы и карты союзников">союзники</span>';
+  ' <span class="promo-chip allies-chip" title="Allies expansion: Power tokens and ally cards">allies</span>';
 
 function modeChips(resp) {
   return (resp.promo ? PROMO_CHIP : "") + (resp.allies ? ALLIES_CHIP : "");
@@ -1652,13 +1652,13 @@ function setRoom(resp) {
   const info = $("#room-info");
   if (resp.mode === "pvp") {
     const link = `${location.origin}/?room=${resp.room}`;
-    info.innerHTML = `PvP-комната <code>${resp.room}</code>
-      <button class="btn small" id="topbar-copy">📋 ссылка</button>`;
+    info.innerHTML = `PvP room <code>${resp.room}</code>
+      <button class="btn small" id="topbar-copy">📋 link</button>`;
     $("#topbar-copy").addEventListener("click", () => navigator.clipboard.writeText(link));
   } else if (resp.mode === "tutorial") {
-    info.textContent = "🎓 обучение";
+    info.textContent = "🎓 tutorial";
   } else if (resp.mode === "bot") {
-    info.textContent = `против бота: ${ROOM.botLabel || resp.bot_kind}`;
+    info.textContent = `vs bot: ${ROOM.botLabel || resp.bot_kind}`;
   } else {
     info.textContent = "hot-seat";
   }
@@ -1733,7 +1733,7 @@ async function botIfNeeded() {
   try {
     let guard = 0;
     while (G && G.winner === null && actorSeat() === G.bot_seat && guard++ < 80) {
-      $("#turnbar").innerHTML += ' <span class="thinking">🤔 бот думает…</span>';
+      $("#turnbar").innerHTML += ' <span class="thinking">🤔 bot is thinking…</span>';
       const before = visibleSnapshot(G);
       const next = await post(`/api/room/${ROOM.id}/bot_step`, { token: ROOM.token });
       await flashBotMove(before, next); // сначала показать, ЧТО он взял, потом перерисовать
@@ -1749,7 +1749,7 @@ async function botIfNeeded() {
 async function doMove(m) {
   if (!canAct()) return;
   if (window.TUT && TUT.active() && !TUT.allowMove(m)) {
-    toast("🎓 Сейчас сделай подсвеченный ход — остальное потом");
+    toast("🎓 Make the highlighted move first");
     return;
   }
   mapSel = null;
@@ -1759,7 +1759,7 @@ async function doMove(m) {
     if (window.TUT) TUT.onMoved();
     await botIfNeeded();
   } catch (e) {
-    toast("Ход отклонён: " + e.message);
+    toast("Move rejected: " + e.message);
   }
 }
 
@@ -1872,12 +1872,12 @@ $("#start-bot").addEventListener("click", async () => {
       allies: $("#bot-allies").checked,
     });
   } catch (e) {
-    toast("Не удалось создать партию: " + e.message);
+    toast("Could not create the game: " + e.message);
     return;
   }
   setRoom(resp);
   ROOM.botLabel = picked ? picked.textContent : pickedBot;
-  $("#room-info").textContent = `против бота: ${ROOM.botLabel}`;
+  $("#room-info").textContent = `vs bot: ${ROOM.botLabel}`;
   $("#room-info").innerHTML += modeChips(resp);
   hideLobby();
   await botIfNeeded(); // if the bot's side opens the game
@@ -1894,7 +1894,7 @@ $("#start-hotseat").addEventListener("click", async () => {
       allies: $("#hs-allies").checked,
     });
   } catch (e) {
-    toast("Не удалось создать партию: " + e.message);
+    toast("Could not create the game: " + e.message);
     return;
   }
   setRoom(resp);
@@ -1906,7 +1906,7 @@ $("#lobby-tutorial").addEventListener("click", async () => {
   try {
     resp = await post("/api/room/new", { mode: "tutorial" });
   } catch (e) {
-    toast("Не удалось создать обучение: " + e.message);
+    toast("Could not create the tutorial: " + e.message);
     return;
   }
   setRoom(resp);
@@ -1937,7 +1937,7 @@ async function joinRoom(rid) {
     hideLobby();
     startPolling();
   } catch (e) {
-    $("#join-info").textContent = "Не удалось подключиться: " + e.message;
+    $("#join-info").textContent = "Could not connect: " + e.message;
   }
 }
 

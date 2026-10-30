@@ -1,105 +1,105 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Дуэль за Средиземье — прототип</title>
+<title>Duel for Middle-earth — prototype</title>
 <link rel="stylesheet" href="/static/style.css?v=63">
 </head>
 <body>
 
 <div class="lobby" id="lobby">
   <div class="lobby-card">
-    <h1>⚔️ Дуэль за Средиземье</h1>
-    <p class="lobby-sub">Прототип с ботами-исследователями: от случайного до нейросетевого чемпиона</p>
+    <h1>⚔️ Duel for Middle-earth</h1>
+    <p class="lobby-sub">A prototype with research bots, from random play to a neural-network champion</p>
 
     <div class="lobby-section" id="lobby-main">
-      <button class="btn lobby-big" id="lobby-tutorial">🎓 Обучение — интерактивный туториал</button>
-      <button class="btn lobby-big" id="lobby-bot">🤖 Играть с ботом</button>
-      <button class="btn lobby-big" id="lobby-pvp">🔗 Играть с другом по ссылке</button>
-      <button class="btn lobby-big" id="lobby-hotseat">👥 Hot-seat за одним экраном</button>
+      <button class="btn lobby-big" id="lobby-tutorial">🎓 Interactive tutorial</button>
+      <button class="btn lobby-big" id="lobby-bot">🤖 Play a bot</button>
+      <button class="btn lobby-big" id="lobby-pvp">🔗 Play a friend by link</button>
+      <button class="btn lobby-big" id="lobby-hotseat">👥 Hot-seat on one screen</button>
       <a class="rules-link" href="https://youtu.be/awjEOjo3LTU" target="_blank" rel="noopener">
         <span class="rules-ico">📺</span>
         <span>
-          <b>Не знаешь правил?</b><br>
-          <small>Посмотри видео-объяснение — и возвращайся</small>
+          <b>New to the rules?</b><br>
+          <small>Watch the video explainer, then come back</small>
         </span>
       </a>
     </div>
 
     <div class="lobby-section hidden" id="lobby-bot-opts">
-      <div class="bot-pick-title">Выбери соперника:</div>
+      <div class="bot-pick-title">Choose your opponent:</div>
       <div class="bot-pick" id="bot-pick"></div>
-      <div class="bot-pick-title automa-title">🎲 Автома — соло-режим по печатным правилам
-        <small>решения по картам и кубику, как в настольном соло-варианте</small></div>
+      <div class="bot-pick-title automa-title">🎲 Automa: solo mode from the printed rules
+        <small>decisions by cards and die, like the tabletop solo variant</small></div>
       <div class="bot-pick automa-pick" id="automa-pick"></div>
       <div class="bot-desc" id="bot-desc"></div>
-      <label>Я играю за:
+      <label>I play as:
         <select id="side-select">
-          <option value="random" selected>🎲 Случайно</option>
-          <option value="0">Братство Кольца</option>
-          <option value="1">Саурона</option>
+          <option value="random" selected>🎲 Random</option>
+          <option value="0">Fellowship</option>
+          <option value="1">Sauron</option>
         </select>
       </label>
-      <label class="chk"><input type="checkbox" id="promo" autocomplete="off"> Промо-тайлы</label>
-      <label class="chk"><input type="checkbox" id="bot-allies" autocomplete="off"> Дополнение «Союзники»</label>
-      <small class="chk-note" id="bot-allies-note">герои играют с союзниками, автомы — только базу</small>
-      <label class="chk"><input type="checkbox" id="cb-bot"> Режим для дальтоников</label>
+      <label class="chk"><input type="checkbox" id="promo" autocomplete="off"> Promo tiles</label>
+      <label class="chk"><input type="checkbox" id="bot-allies" autocomplete="off"> Allies expansion</label>
+      <small class="chk-note" id="bot-allies-note">hero bots play with Allies, automas play the base game only</small>
+      <label class="chk"><input type="checkbox" id="cb-bot"> Colorblind mode</label>
       <div class="lobby-btns">
-        <button class="btn ghost" data-back>← Назад</button>
-        <button class="btn" id="start-bot">Начать партию</button>
+        <button class="btn ghost" data-back>← Back</button>
+        <button class="btn" id="start-bot">Start game</button>
       </div>
     </div>
 
     <div class="lobby-section hidden" id="lobby-pvp-opts">
-      <label>Я играю за:
+      <label>I play as:
         <select id="pvp-side-select">
-          <option value="random" selected>🎲 Случайно</option>
-          <option value="0">Братство Кольца</option>
-          <option value="1">Саурона</option>
+          <option value="random" selected>🎲 Random</option>
+          <option value="0">Fellowship</option>
+          <option value="1">Sauron</option>
         </select>
       </label>
-      <label class="chk"><input type="checkbox" id="pvp-promo" autocomplete="off"> Промо-тайлы</label>
-      <label class="chk"><input type="checkbox" id="pvp-allies" autocomplete="off"> Дополнение «Союзники»</label>
-      <label class="chk"><input type="checkbox" id="cb-pvp"> Режим для дальтоников</label>
+      <label class="chk"><input type="checkbox" id="pvp-promo" autocomplete="off"> Promo tiles</label>
+      <label class="chk"><input type="checkbox" id="pvp-allies" autocomplete="off"> Allies expansion</label>
+      <label class="chk"><input type="checkbox" id="cb-pvp"> Colorblind mode</label>
       <div class="lobby-btns">
-        <button class="btn ghost" data-back>← Назад</button>
-        <button class="btn" id="start-pvp">Создать комнату</button>
+        <button class="btn ghost" data-back>← Back</button>
+        <button class="btn" id="start-pvp">Create room</button>
       </div>
     </div>
 
     <div class="lobby-section hidden" id="lobby-hotseat-opts">
-      <p class="lobby-sub">Оба игрока ходят по очереди на одном экране.</p>
-      <label class="chk"><input type="checkbox" id="hs-promo" autocomplete="off"> Промо-тайлы</label>
-      <label class="chk"><input type="checkbox" id="hs-allies" autocomplete="off"> Дополнение «Союзники»</label>
+      <p class="lobby-sub">Both players take turns on one screen.</p>
+      <label class="chk"><input type="checkbox" id="hs-promo" autocomplete="off"> Promo tiles</label>
+      <label class="chk"><input type="checkbox" id="hs-allies" autocomplete="off"> Allies expansion</label>
       <div class="lobby-btns">
-        <button class="btn ghost" data-back>← Назад</button>
-        <button class="btn" id="start-hotseat">Начать партию</button>
+        <button class="btn ghost" data-back>← Back</button>
+        <button class="btn" id="start-hotseat">Start game</button>
       </div>
     </div>
 
     <div class="lobby-section hidden" id="lobby-wait">
-      <p>Комната создана. Отправь другу ссылку:</p>
+      <p>Room created. Send this link to a friend:</p>
       <div class="room-link-row">
         <code id="room-link"></code>
-        <button class="btn small" id="copy-link">📋 Копировать</button>
+        <button class="btn small" id="copy-link">📋 Copy</button>
       </div>
-      <p class="waiting-pulse">⏳ Ожидание соперника…</p>
+      <p class="waiting-pulse">⏳ Waiting for your opponent…</p>
     </div>
 
     <div class="lobby-section hidden" id="lobby-join">
-      <p id="join-info">Подключаюсь к комнате…</p>
+      <p id="join-info">Joining the room…</p>
     </div>
   </div>
 </div>
 
 <div class="modal hidden" id="confirm-modal">
   <div class="modal-card">
-    <h2>Покинуть партию?</h2>
-    <p>Текущая партия будет оставлена. Вернуться к ней можно,<br>пока комната жива (по той же ссылке).</p>
+    <h2>Leave the game?</h2>
+    <p>You will leave the current game. You can return<br>by the same link while the room is active.</p>
     <div class="lobby-btns">
-      <button class="btn" id="confirm-yes">⚔️ Выйти в лобби</button>
-      <button class="btn ghost" id="confirm-no">Остаться</button>
+      <button class="btn" id="confirm-yes">⚔️ Back to lobby</button>
+      <button class="btn ghost" id="confirm-no">Stay</button>
     </div>
   </div>
 </div>
@@ -108,42 +108,42 @@
 <!-- мобильный оверлей «все мои карты» -->
 <div class="modal hidden" id="hand-overlay">
   <div class="modal-card hand-card">
-    <h2 id="hand-title">Мои карты</h2>
+    <h2 id="hand-title">My cards</h2>
     <div class="hand-toggle">
-      <button class="btn small on" id="hand-me">🃏 Мои</button>
-      <button class="btn small" id="hand-opp">🛡 Противника</button>
+      <button class="btn small on" id="hand-me">🃏 Mine</button>
+      <button class="btn small" id="hand-opp">🛡 Opponent</button>
     </div>
     <div class="hand-sum" id="hand-sum"></div>
     <div id="hand-full"></div>
-    <div class="lobby-btns"><button class="btn" id="hand-close">Закрыть</button></div>
+    <div class="lobby-btns"><button class="btn" id="hand-close">Close</button></div>
   </div>
 </div>
 
 <!-- история партии (мобайл: кнопка 📜 в шапке) -->
 <div class="modal hidden" id="log-overlay">
   <div class="modal-card log-card">
-    <h2>📜 История партии</h2>
+    <h2>📜 Game history</h2>
     <div class="quest-log" id="log-full"></div>
-    <div class="lobby-btns"><button class="btn" id="log-close">Закрыть</button></div>
+    <div class="lobby-btns"><button class="btn" id="log-close">Close</button></div>
   </div>
 </div>
 
 <!-- автома: как соло-бот принимает решения (тап по бару автомы) -->
 <div class="modal hidden" id="automa-overlay">
   <div class="modal-card automa-card">
-    <h2 id="automa-title">🎲 Автома</h2>
+    <h2 id="automa-title">🎲 Automa</h2>
     <div class="automa-head">
-      <img id="automa-art" alt="персонаж автомы" draggable="false">
+      <img id="automa-art" alt="automa character" draggable="false">
       <div class="automa-info">
         <div id="automa-power"></div>
         <div id="automa-deckinfo" class="small"></div>
       </div>
     </div>
-    <div class="automa-sub">Текущая карта решения</div>
+    <div class="automa-sub">Current decision card</div>
     <div id="automa-decision"></div>
-    <div class="automa-sub">Ход рассуждений</div>
+    <div class="automa-sub">Reasoning</div>
     <div class="automa-trace" id="automa-trace"></div>
-    <div class="lobby-btns"><button class="btn" id="automa-close">Закрыть</button></div>
+    <div class="lobby-btns"><button class="btn" id="automa-close">Close</button></div>
   </div>
 </div>
 
@@ -152,7 +152,7 @@
   <button class="btn small" id="m-lobby">←</button>
   <span id="m-turn">—</span>
   <span id="m-opp"></span>
-  <button class="btn small" id="m-log" title="История партии">📜</button>
+  <button class="btn small" id="m-log" title="Game history">📜</button>
 </div>
 
 <!-- мобильный нижний бар: слева зелёные карты, справа жетоны; ниже деньги/кнопки -->
@@ -164,11 +164,11 @@
   <div class="dock-bar">
     <div class="dock-side">
       <span class="dock-coin f" id="dock-coins">🪙 —</span>
-      <button class="btn small" id="dock-all">🃏 мои</button>
+      <button class="btn small" id="dock-all">🃏 mine</button>
     </div>
-    <button class="btn small" id="dock-sold">🗑 сброс</button>
+    <button class="btn small" id="dock-sold">🗑 discard</button>
     <div class="dock-side">
-      <button class="btn small" id="dock-opp">🛡 враг</button>
+      <button class="btn small" id="dock-opp">🛡 enemy</button>
       <span class="dock-coin s" id="dock-opp-coins">🪙 —</span>
     </div>
   </div>
@@ -177,14 +177,14 @@
 <div class="table">
 
   <aside class="player-area fellowship" id="panel-0">
-    <h2>Братство Кольца</h2>
+    <h2>Fellowship</h2>
     <div class="panel-body"></div>
   </aside>
 
   <main class="center">
     <header class="topbar">
       <div class="chapter-buttons">
-        <button class="btn" id="to-lobby">← В лобби</button>
+        <button class="btn" id="to-lobby">← Lobby</button>
         <span class="room-info" id="room-info"></span>
       </div>
       <div class="pools">
@@ -192,9 +192,9 @@
       </div>
     </header>
 
-    <section class="turnbar" id="turnbar">Нажми «Новая партия»</section>
+    <section class="turnbar" id="turnbar">Press “New game”</section>
     <section class="automa-bar hidden" id="automa-bar" role="button" tabindex="0"
-      title="Как автома принимает решения"></section>
+      title="How the automa decides"></section>
     <section class="prompt" id="prompt" style="display:none"></section>
 
     <section class="supply-row">
@@ -207,7 +207,7 @@
       <div class="tableau-wrap">
         <div class="piles" id="piles"></div>
         <div class="tableau" id="tableau">
-          <div class="empty-hint">Партия не начата</div>
+          <div class="empty-hint">No game started</div>
         </div>
       </div>
       <section class="board">
@@ -226,7 +226,7 @@
   </main>
 
   <aside class="player-area sauron" id="panel-1">
-    <h2>Саурон</h2>
+    <h2>Sauron</h2>
     <div class="panel-body"></div>
   </aside>
 
